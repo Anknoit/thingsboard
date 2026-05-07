@@ -1,0 +1,25 @@
+name,device_class,location,protocol,asset_group,description
+AHU-1A,hvac,Floor 1 East,mqtt,BMS/HVAC,Air Handling Unit 1A
+AHU-1B,hvac,Floor 1 West,mqtt,BMS/HVAC,Air Handling Unit 1B
+AHU-2A,hvac,Floor 2 East,mqtt,BMS/HVAC,Air Handling Unit 2A
+AHU-2B,hvac,Floor 2 West,mqtt,BMS/HVAC,Air Handling Unit 2B
+AHU-3A,hvac,Floor 3 East,mqtt,BMS/HVAC,Air Handling Unit 3A
+AHU-3B,hvac,Floor 3 West,mqtt,BMS/HVAC,Air Handling Unit 3B
+EM-Floor1,energy,Floor 1 MDB,modbus,BMS/Energy,Energy Meter Floor 1
+EM-Floor2,energy,Floor 2 MDB,modbus,BMS/Energy,Energy Meter Floor 2
+EM-Floor3,energy,Floor 3 MDB,modbus,BMS/Energy,Energy Meter Floor 3
+OCC-Floor1,occupancy,Floor 1 Lobby,mqtt,BMS/Occupancy,Occupancy Sensor Floor 1
+OCC-Floor2,occupancy,Floor 2 Lobby,mqtt,BMS/Occupancy,Occupancy Sensor Floor 2
+ELV-Main,elevator,Basement,bacnet,BMS/Elevator,Main Elevator Bank
+FIRE-Main,fire,Ground Floor,bacnet,BMS/Fire_Access,Fire Panel Main
+ACCESS-Main,fire,Ground Floor,mqtt,BMS/Fire_Access,Access Control Panel
+SW-Core,network,Server Room,snmp,NMS/Network,Core Switch
+SW-B1,network,Floor 1 IDF,snmp,NMS/Network,Floor 1 Switch
+SW-B2,network,Floor 2 IDF,snmp,NMS/Network,Floor 2 Switch
+SW-B3,network,Floor 3 IDF,snmp,NMS/Network,Floor 3 Switch
+BTS-North,network,Rooftop North,mqtt,NMS/Network,BTS Base Station North
+BTS-South,network,Rooftop South,mqtt,NMS/Network,BTS Base Station South
+SRV-Primary,infra,Server Room,snmp,NMS/Infrastructure,Primary Application Server
+SRV-Backup,infra,Server Room,snmp,NMS/Infrastructure,Backup Server
+UPS-Main,infra,Server Room,snmp,NMS/Infrastructure,Main UPS Unit
+FW-Main,infra,Server Room,snmp,NMS/Infrastructure,Main Firewall

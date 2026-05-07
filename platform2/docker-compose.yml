@@ -1,0 +1,217 @@
+version: "3.9"
+
+networks:
+  platform2-net:
+    driver: bridge
+
+volumes:
+  tb-data:
+    labels: { backup: "true" }
+  tb-logs:
+  pg-data:
+    labels: { backup: "true" }
+  kafka-data:
+  zookeeper-data:
+  zookeeper-logs:
+  redis-data:
+  chroma-data:
+    labels: { backup: "true" }
+
+services:
+
+  # ── ThingsBoard CE ─────────────────────────────────────────────────────────
+  thingsboard:
+    image: thingsboard/tb-postgres:latest
+    restart: unless-stopped
+    networks: [platform2-net]
+    ports:
+      - "8080:9090"   # HTTP UI + REST API
+      - "1883:1883"   # MQTT
+      - "5683:5683/udp"  # CoAP
+    environment:
+      TB_QUEUE_TYPE: kafka
+      TB_KAFKA_SERVERS: kafka:9092
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/thingsboard
+      SPRING_DATASOURCE_USERNAME: tb
+      SPRING_DATASOURCE_PASSWORD: ${TB_DB_PASSWORD:-changeme}
+      # JWT
+      JWT_TOKEN_EXPIRATION_TIME: 9000
+      JWT_REFRESH_TOKEN_EXPIRATION_TIME: 604800
+      # Demo admin credentials (change on first run)
+      # Initial tenant set via UI after first boot
+    volumes:
+      - tb-data:/data
+      - tb-logs:/var/log/thingsboard
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/api/noauth/activate"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+  # ── Zookeeper ──────────────────────────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    restart: unless-stopped
+    networks: [platform2-net]
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-logs:/var/lib/zookeeper/log
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Apache Kafka ───────────────────────────────────────────────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    restart: unless-stopped
+    networks: [platform2-net]
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:29092"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # ── PostgreSQL + TimescaleDB ───────────────────────────────────────────────
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    restart: unless-stopped
+    networks: [platform2-net]
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: tb
+      POSTGRES_PASSWORD: ${TB_DB_PASSWORD:-changeme}
+      POSTGRES_MULTIPLE_DATABASES: thingsboard,platform2
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./scripts/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tb -d thingsboard"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ──────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    restart: unless-stopped
+    networks: [platform2-net]
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ── ChromaDB ───────────────────────────────────────────────────────────────
+  chroma:
+    image: chromadb/chroma:latest
+    restart: unless-stopped
+    networks: [platform2-net]
+    ports:
+      - "8001:8000"
+    environment:
+      CHROMA_SERVER_HOST: 0.0.0.0
+      CHROMA_SERVER_HTTP_PORT: 8000
+      IS_PERSISTENT: "TRUE"
+      PERSIST_DIRECTORY: /chroma/data
+    volumes:
+      - chroma-data:/chroma/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── FastAPI AI Services ────────────────────────────────────────────────────
+  fastapi:
+    build:
+      context: ./fastapi
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    networks: [platform2-net]
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      TB_URL: http://thingsboard:9090
+      POSTGRES_URL: postgresql+asyncpg://p2:${P2_DB_PASSWORD:-changeme}@postgres:5432/platform2
+      REDIS_URL: redis://redis:6379
+      KAFKA_BOOTSTRAP: kafka:29092
+      CHROMA_HOST: chroma
+      CHROMA_PORT: 8000
+    volumes:
+      - ./fastapi:/app
+      - ./models:/app/models
+      - ./knowledge_base:/app/knowledge_base
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      chroma:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── Simulator (demo only — disable in production) ─────────────────────────
+  simulator:
+    build:
+      context: ./simulator
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    networks: [platform2-net]
+    ports:
+      - "8001:8001"
+    profiles: [demo]
+    environment:
+      TB_URL: http://thingsboard:9090
+      TB_MQTT_HOST: thingsboard
+      TB_MQTT_PORT: 1883
+      FASTAPI_URL: http://fastapi:8000
+      CREDENTIALS_CSV: /app/credentials.csv
+    volumes:
+      - ./simulator:/app
+    depends_on:
+      thingsboard:
+        condition: service_healthy

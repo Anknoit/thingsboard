@@ -1,0 +1,115 @@
+{
+  "ruleChain": {
+    "name": "Vantage NMS — Alarm Webhooks",
+    "type": "CORE",
+    "firstRuleNodeId": null,
+    "debugMode": false,
+    "configuration": null,
+    "additionalInfo": {
+      "description": "Fires webhook to FastAPI on alarm creation. Detects cascade (3+ alarms in 60s window) and fires cascade webhook."
+    }
+  },
+  "metadata": {
+    "firstNodeIndex": 0,
+    "nodes": [
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbMsgTypeFilterNode",
+        "name": "Filter: ALARM messages only",
+        "debugMode": false,
+        "configuration": {
+          "messageTypes": ["ALARM"]
+        },
+        "additionalInfo": { "layoutX": 100, "layoutY": 200 }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+        "name": "Filter: only new alarms (CREATED)",
+        "debugMode": false,
+        "configuration": {
+          "jsScript": "return msg.status === 'ACTIVE_UNACK' && metadata.isNewAlarm === 'true';"
+        },
+        "additionalInfo": { "layoutX": 300, "layoutY": 200 }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.rest.TbRestApiCallNode",
+        "name": "Webhook: POST /webhook/alarm",
+        "debugMode": false,
+        "configuration": {
+          "restEndpointUrlPattern": "${FASTAPI_URL:http://fastapi:8000}/webhook/alarm",
+          "requestMethod": "POST",
+          "useSimpleClientHttpFactory": false,
+          "parseToPlainText": false,
+          "ignoreRequestBody": false,
+          "enableProxy": false,
+          "useSystemProxyProperties": false,
+          "proxyHost": "",
+          "proxyPort": 0,
+          "proxyUser": "",
+          "proxyPassword": "",
+          "proxyScheme": "",
+          "readTimeoutMs": 5000,
+          "maxParallelRequestsCount": 0,
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "useRedirectStrategy": false,
+          "trimDoubleQuotes": false,
+          "bodyTemplate": "{\"alarm_id\": \"${alarmId}\", \"entity_id\": \"${originator}\", \"entity_name\": \"${deviceName}\", \"alarm_type\": \"${msg.type}\", \"severity\": \"${msg.severity}\", \"details\": ${msg.details}, \"ts\": ${ts}}"
+        },
+        "additionalInfo": { "layoutX": 550, "layoutY": 100 }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.flow.TbCheckpointNode",
+        "name": "Checkpoint: cascade counter",
+        "debugMode": false,
+        "configuration": {
+          "queueName": "HighPriority"
+        },
+        "additionalInfo": { "layoutX": 550, "layoutY": 300 }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+        "name": "Dedup: skip if same alarm seen in 60s",
+        "debugMode": false,
+        "configuration": {
+          "jsScript": "// Cascade detection uses a 60-second tumbling window counted externally in FastAPI.\n// Here we simply pass all alarm messages through; FastAPI maintains the counter.\nreturn true;"
+        },
+        "additionalInfo": { "layoutX": 750, "layoutY": 300 }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.rest.TbRestApiCallNode",
+        "name": "Webhook: POST /webhook/cascade (conditional)",
+        "debugMode": false,
+        "configuration": {
+          "restEndpointUrlPattern": "${FASTAPI_URL:http://fastapi:8000}/webhook/cascade",
+          "requestMethod": "POST",
+          "readTimeoutMs": 5000,
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "bodyTemplate": "{\"alarm_id\": \"${alarmId}\", \"entity_id\": \"${originator}\", \"entity_name\": \"${deviceName}\", \"alarm_type\": \"${msg.type}\", \"severity\": \"${msg.severity}\", \"ts\": ${ts}}"
+        },
+        "additionalInfo": { "layoutX": 950, "layoutY": 300 }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbLogNode",
+        "name": "Log: webhook failure",
+        "debugMode": false,
+        "configuration": {
+          "jsScript": "return 'Webhook failed for alarm ' + metadata.alarmId + ': ' + metadata.error;"
+        },
+        "additionalInfo": { "layoutX": 750, "layoutY": 500 }
+      }
+    ],
+    "connections": [
+      { "fromIndex": 0, "toIndex": 1, "type": "True" },
+      { "fromIndex": 1, "toIndex": 2, "type": "True" },
+      { "fromIndex": 1, "toIndex": 3, "type": "True" },
+      { "fromIndex": 2, "toIndex": 6, "type": "Failure" },
+      { "fromIndex": 3, "toIndex": 4, "type": "Success" },
+      { "fromIndex": 4, "toIndex": 5, "type": "True" },
+      { "fromIndex": 5, "toIndex": 6, "type": "Failure" }
+    ],
+    "ruleChainConnections": null
+  }
+}

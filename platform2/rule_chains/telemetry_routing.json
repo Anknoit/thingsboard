@@ -1,0 +1,171 @@
+{
+  "ruleChain": {
+    "name": "Vantage NMS — Telemetry Kafka Routing",
+    "type": "CORE",
+    "firstRuleNodeId": null,
+    "debugMode": false,
+    "configuration": null,
+    "additionalInfo": {
+      "description": "Routes incoming device telemetry to Kafka topics partitioned by device_class. Also forwards to default TB processing."
+    }
+  },
+  "metadata": {
+    "firstNodeIndex": 0,
+    "nodes": [
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbMsgTypeFilterNode",
+        "name": "Filter: POST_TELEMETRY only",
+        "debugMode": false,
+        "configuration": {
+          "messageTypes": ["POST_TELEMETRY_REQUEST"]
+        },
+        "additionalInfo": { "layoutX": 100, "layoutY": 200 }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.metadata.TbGetAttributesNode",
+        "name": "Enrich: get device_class attribute",
+        "debugMode": false,
+        "configuration": {
+          "fetchTo": "METADATA",
+          "clientAttributeNames": [],
+          "sharedAttributeNames": ["device_class", "location"],
+          "serverAttributeNames": [],
+          "telemetryNames": [],
+          "getLatestValueWithTs": false
+        },
+        "additionalInfo": { "layoutX": 300, "layoutY": 200 }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbJsSwitchNode",
+        "name": "Switch: route by device_class",
+        "debugMode": false,
+        "configuration": {
+          "jsScript": "function nextRelation(metadata, msg) {\n  var deviceClass = metadata.device_class || 'unknown';\n  if (deviceClass === 'hvac') return ['hvac'];\n  if (deviceClass === 'energy') return ['energy'];\n  if (deviceClass === 'occupancy' || deviceClass === 'elevator' || deviceClass === 'fire') return ['bms_other'];\n  if (deviceClass === 'network') return ['network'];\n  if (deviceClass === 'infra') return ['infra'];\n  return ['unknown'];\n}"
+        },
+        "additionalInfo": { "layoutX": 550, "layoutY": 200 }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.kafka.TbKafkaNode",
+        "name": "Kafka: bms.hvac",
+        "debugMode": false,
+        "configuration": {
+          "bootstrapServers": "${KAFKA_BOOTSTRAP:kafka:9092}",
+          "topicPattern": "tb.telemetry.bms.hvac",
+          "keyPattern": "${deviceId}",
+          "bodyTemplate": "{\"ts\": ${ts}, \"device_id\": \"${deviceId}\", \"device_class\": \"${metadata.device_class}\", \"device_name\": \"${deviceName}\", \"location\": \"${metadata.location}\", \"telemetry\": ${msg}}",
+          "addMetadataKeyValuesAsKafkaHeaders": false,
+          "kafkaHeadersCharset": "UTF-8",
+          "retries": 3,
+          "batchSize": 16384,
+          "linger": 1,
+          "bufferMemory": 33554432,
+          "acks": "all",
+          "keySerializer": "org.apache.kafka.common.serialization.StringSerializer",
+          "valueSerializer": "org.apache.kafka.common.serialization.StringSerializer",
+          "otherProperties": {}
+        },
+        "additionalInfo": { "layoutX": 800, "layoutY": 50 }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.kafka.TbKafkaNode",
+        "name": "Kafka: bms.energy",
+        "debugMode": false,
+        "configuration": {
+          "bootstrapServers": "${KAFKA_BOOTSTRAP:kafka:9092}",
+          "topicPattern": "tb.telemetry.bms.energy",
+          "keyPattern": "${deviceId}",
+          "bodyTemplate": "{\"ts\": ${ts}, \"device_id\": \"${deviceId}\", \"device_class\": \"${metadata.device_class}\", \"device_name\": \"${deviceName}\", \"location\": \"${metadata.location}\", \"telemetry\": ${msg}}",
+          "retries": 3,
+          "batchSize": 16384,
+          "linger": 1,
+          "bufferMemory": 33554432,
+          "acks": "all",
+          "keySerializer": "org.apache.kafka.common.serialization.StringSerializer",
+          "valueSerializer": "org.apache.kafka.common.serialization.StringSerializer",
+          "otherProperties": {}
+        },
+        "additionalInfo": { "layoutX": 800, "layoutY": 150 }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.kafka.TbKafkaNode",
+        "name": "Kafka: bms.other",
+        "debugMode": false,
+        "configuration": {
+          "bootstrapServers": "${KAFKA_BOOTSTRAP:kafka:9092}",
+          "topicPattern": "tb.telemetry.bms.other",
+          "keyPattern": "${deviceId}",
+          "bodyTemplate": "{\"ts\": ${ts}, \"device_id\": \"${deviceId}\", \"device_class\": \"${metadata.device_class}\", \"device_name\": \"${deviceName}\", \"location\": \"${metadata.location}\", \"telemetry\": ${msg}}",
+          "retries": 3,
+          "batchSize": 16384,
+          "linger": 1,
+          "bufferMemory": 33554432,
+          "acks": "all",
+          "keySerializer": "org.apache.kafka.common.serialization.StringSerializer",
+          "valueSerializer": "org.apache.kafka.common.serialization.StringSerializer",
+          "otherProperties": {}
+        },
+        "additionalInfo": { "layoutX": 800, "layoutY": 250 }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.kafka.TbKafkaNode",
+        "name": "Kafka: nms.network",
+        "debugMode": false,
+        "configuration": {
+          "bootstrapServers": "${KAFKA_BOOTSTRAP:kafka:9092}",
+          "topicPattern": "tb.telemetry.nms.network",
+          "keyPattern": "${deviceId}",
+          "bodyTemplate": "{\"ts\": ${ts}, \"device_id\": \"${deviceId}\", \"device_class\": \"${metadata.device_class}\", \"device_name\": \"${deviceName}\", \"location\": \"${metadata.location}\", \"telemetry\": ${msg}}",
+          "retries": 3,
+          "batchSize": 16384,
+          "linger": 1,
+          "bufferMemory": 33554432,
+          "acks": "all",
+          "keySerializer": "org.apache.kafka.common.serialization.StringSerializer",
+          "valueSerializer": "org.apache.kafka.common.serialization.StringSerializer",
+          "otherProperties": {}
+        },
+        "additionalInfo": { "layoutX": 800, "layoutY": 350 }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.kafka.TbKafkaNode",
+        "name": "Kafka: nms.infra",
+        "debugMode": false,
+        "configuration": {
+          "bootstrapServers": "${KAFKA_BOOTSTRAP:kafka:9092}",
+          "topicPattern": "tb.telemetry.nms.infra",
+          "keyPattern": "${deviceId}",
+          "bodyTemplate": "{\"ts\": ${ts}, \"device_id\": \"${deviceId}\", \"device_class\": \"${metadata.device_class}\", \"device_name\": \"${deviceName}\", \"location\": \"${metadata.location}\", \"telemetry\": ${msg}}",
+          "retries": 3,
+          "batchSize": 16384,
+          "linger": 1,
+          "bufferMemory": 33554432,
+          "acks": "all",
+          "keySerializer": "org.apache.kafka.common.serialization.StringSerializer",
+          "valueSerializer": "org.apache.kafka.common.serialization.StringSerializer",
+          "otherProperties": {}
+        },
+        "additionalInfo": { "layoutX": 800, "layoutY": 450 }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbLogNode",
+        "name": "Log: unknown device_class",
+        "debugMode": false,
+        "configuration": {
+          "jsScript": "return 'Unknown device_class: ' + metadata.device_class + ' for device ' + metadata.deviceName;"
+        },
+        "additionalInfo": { "layoutX": 800, "layoutY": 550 }
+      }
+    ],
+    "connections": [
+      { "fromIndex": 0, "toIndex": 1, "type": "True" },
+      { "fromIndex": 1, "toIndex": 2, "type": "Success" },
+      { "fromIndex": 2, "toIndex": 3, "type": "hvac" },
+      { "fromIndex": 2, "toIndex": 4, "type": "energy" },
+      { "fromIndex": 2, "toIndex": 5, "type": "bms_other" },
+      { "fromIndex": 2, "toIndex": 6, "type": "network" },
+      { "fromIndex": 2, "toIndex": 7, "type": "infra" },
+      { "fromIndex": 2, "toIndex": 8, "type": "unknown" }
+    ],
+    "ruleChainConnections": null
+  }
+}
