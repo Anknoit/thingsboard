@@ -84,15 +84,32 @@ async def _analyze_cascade_bg(alarm_entries: list[dict], tb: TBClient) -> None:
     all cascade alarms in ThingsBoard.
     """
     try:
+        from services.anomaly import get_anomaly_service
         from services.gnn import get_gnn_service
 
         entity_ids = [e["entity_id"] for e in alarm_entries]
-        alarm_ids = [e["alarm_id"] for e in alarm_entries]
+        alarm_ids  = [e["alarm_id"]  for e in alarm_entries]
+
+        # Collect anomaly scores + alarm counts to feed the GNN
+        anomaly_scores: dict[str, float] = {}
+        alarm_counts:   dict[str, int]   = {}
+        anomaly_svc = get_anomaly_service()
+        for entry in alarm_entries:
+            eid = entry["entity_id"]
+            try:
+                attrs = await tb.get_device_attributes(eid)
+                dc    = attrs.get("device_class", "")
+                score = float(attrs.get("ai_anomaly_score", 0.0))
+                anomaly_scores[eid] = score
+                # Count alarms for this device in the current cascade window
+                alarm_counts[eid] = alarm_counts.get(eid, 0) + 1
+            except Exception:
+                pass
 
         t0 = time.monotonic()
         service = get_gnn_service()
         result = await asyncio.get_event_loop().run_in_executor(
-            None, service.find_root_cause, entity_ids
+            None, service.find_root_cause, entity_ids, anomaly_scores, alarm_counts
         )
         duration_ms = int((time.monotonic() - t0) * 1000)
         result.duration_ms = duration_ms
@@ -120,18 +137,21 @@ async def _analyze_cascade_bg(alarm_entries: list[dict], tb: TBClient) -> None:
             len(result.blast_radius),
         )
 
-        # Audit log
+        # Audit log — event type 'alarm_cascade_analyzed' is used for GNN training
         from db.postgres import AsyncSessionLocal, AuditLog
         import uuid
         async with AsyncSessionLocal() as session:
             log = AuditLog(
                 id=uuid.uuid4(),
                 entity_id=result.root_cause_entity_id,
-                event_type="cascade_analysis",
+                event_type="alarm_cascade_analyzed",
                 payload={
                     "alarm_ids": alarm_ids,
                     "entity_ids": entity_ids,
-                    "result": result.model_dump(),
+                    "root_cause_entity_id": result.root_cause_entity_id,
+                    "anomaly_scores": anomaly_scores,
+                    "alarm_counts": alarm_counts,
+                    "confidence": result.confidence,
                     "duration_ms": duration_ms,
                 },
             )

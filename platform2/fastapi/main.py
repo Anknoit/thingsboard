@@ -74,10 +74,15 @@ async def lifespan(app: FastAPI):
     app.state.kafka_task = consumer_task
     log.info("kafka.consumer.started")
 
-    # 5. APScheduler (predictive batch job)
+    # 5. APScheduler (predictive batch + topology rebuild)
     try:
         from apscheduler.schedulers.asyncio import AsyncIOScheduler
         from services.predictive_batch import run_predictive_batch
+
+        async def _rebuild_topology() -> None:
+            from services.topology import get_topology
+            topo = get_topology()
+            await topo.async_build()
 
         scheduler = AsyncIOScheduler()
         scheduler.add_job(
@@ -88,12 +93,28 @@ async def lifespan(app: FastAPI):
             id="predictive_batch",
             replace_existing=True,
         )
+        scheduler.add_job(
+            _rebuild_topology,
+            trigger="cron",
+            hour=2,
+            minute=0,
+            id="topology_rebuild",
+            replace_existing=True,
+        )
         scheduler.start()
         app.state.scheduler = scheduler
-        log.info("scheduler.started", batch_hour=settings.lstm_batch_hour)
+        log.info("scheduler.started", batch_hour=settings.lstm_batch_hour, topology_rebuild_hour=2)
     except Exception as exc:
         log.warning("scheduler.unavailable", error=str(exc))
         app.state.scheduler = None
+
+    # 6. Load topology graph from disk (non-blocking — fire and forget)
+    try:
+        from services.topology import get_topology
+        get_topology().load()
+        log.info("topology.loaded")
+    except Exception as exc:
+        log.warning("topology.load_failed", error=str(exc))
 
     yield  # ── application runs ──
 
@@ -194,7 +215,17 @@ async def debug_run_predictive() -> dict:
 @app.post("/debug/rebuild-topology", tags=["debug"])
 async def debug_rebuild_topology() -> dict:
     """Force-rebuild the device topology graph."""
-    from services.topology import TopologyGraph
-    graph = TopologyGraph()
-    await asyncio.get_event_loop().run_in_executor(None, graph.build_from_tb)
-    return {"status": "rebuilt"}
+    from services.topology import get_topology
+    topo = get_topology()
+    await topo.async_build()
+    return {"status": "rebuilt", "stats": topo.stats()}
+
+
+@app.post("/debug/train-gnn", tags=["debug"])
+async def debug_train_gnn(lookback_days: int = 30, epochs: int = 50) -> dict:
+    """Train the GNN root cause model from audit log cascade entries."""
+    from services.gnn import get_gnn_service
+    result = await get_gnn_service().train_from_audit_log(
+        lookback_days=lookback_days, epochs=epochs
+    )
+    return result
