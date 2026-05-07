@@ -1,0 +1,130 @@
+[
+  {
+    "name": "AHU-01",
+    "device_class": "hvac",
+    "access_token": "AHU01_TOKEN",
+    "floor": "G",
+    "zone": "North Wing",
+    "label": "Air Handling Unit"
+  },
+  {
+    "name": "AHU-02",
+    "device_class": "hvac",
+    "access_token": "AHU02_TOKEN",
+    "floor": "1",
+    "zone": "South Wing",
+    "label": "Air Handling Unit"
+  },
+  {
+    "name": "AHU-03",
+    "device_class": "hvac",
+    "access_token": "AHU03_TOKEN",
+    "floor": "2",
+    "zone": "East Wing",
+    "label": "Air Handling Unit"
+  },
+  {
+    "name": "FCU-01",
+    "device_class": "hvac",
+    "access_token": "FCU01_TOKEN",
+    "floor": "3",
+    "zone": "Server Room",
+    "label": "Fan Coil Unit"
+  },
+  {
+    "name": "MSB-01",
+    "device_class": "energy",
+    "access_token": "MSB01_TOKEN",
+    "floor": "B1",
+    "zone": "Main Switch Board",
+    "label": "Main Switch Board"
+  },
+  {
+    "name": "DB-FLOOR1",
+    "device_class": "energy",
+    "access_token": "DBFL1_TOKEN",
+    "floor": "1",
+    "zone": "Electrical Room",
+    "label": "Distribution Board"
+  },
+  {
+    "name": "DB-FLOOR2",
+    "device_class": "energy",
+    "access_token": "DBFL2_TOKEN",
+    "floor": "2",
+    "zone": "Electrical Room",
+    "label": "Distribution Board"
+  },
+  {
+    "name": "SW-CORE-01",
+    "device_class": "network",
+    "access_token": "SWCO1_TOKEN",
+    "floor": "B1",
+    "zone": "Main IDF",
+    "label": "Core Switch"
+  },
+  {
+    "name": "SW-ACCESS-01",
+    "device_class": "network",
+    "access_token": "SWAC1_TOKEN",
+    "floor": "1",
+    "zone": "IDF Floor 1",
+    "label": "Access Switch"
+  },
+  {
+    "name": "SW-ACCESS-02",
+    "device_class": "network",
+    "access_token": "SWAC2_TOKEN",
+    "floor": "2",
+    "zone": "IDF Floor 2",
+    "label": "Access Switch"
+  },
+  {
+    "name": "FW-01",
+    "device_class": "network",
+    "access_token": "FW001_TOKEN",
+    "floor": "B1",
+    "zone": "Main IDF",
+    "label": "Firewall"
+  },
+  {
+    "name": "SRV-APP-01",
+    "device_class": "infra",
+    "access_token": "SRAP1_TOKEN",
+    "floor": "B1",
+    "zone": "Server Room",
+    "label": "Application Server"
+  },
+  {
+    "name": "SRV-DB-01",
+    "device_class": "infra",
+    "access_token": "SRDB1_TOKEN",
+    "floor": "B1",
+    "zone": "Server Room",
+    "label": "Database Server"
+  },
+  {
+    "name": "SRV-BACKUP-01",
+    "device_class": "infra",
+    "access_token": "SRBK1_TOKEN",
+    "floor": "B1",
+    "zone": "Server Room",
+    "label": "Backup Server"
+  },
+  {
+    "name": "OCC-LOBBY",
+    "device_class": "occupancy",
+    "access_token": "OCLO1_TOKEN",
+    "floor": "G",
+    "zone": "Lobby",
+    "label": "Occupancy Sensor"
+  },
+  {
+    "name": "OCC-FLOOR1",
+    "device_class": "occupancy",
+    "access_token": "OCFL1_TOKEN",
+    "floor": "1",
+    "zone": "Open Plan",
+    "label": "Occupancy Sensor"
+  }
+]

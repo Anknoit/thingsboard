@@ -207,9 +207,13 @@ services:
     environment:
       TB_URL: http://thingsboard:9090
       TB_MQTT_HOST: thingsboard
-      TB_MQTT_PORT: 1883
+      TB_MQTT_PORT: "1883"
+      SIM_INTERVAL: "30"
+      SIM_DEVICES: /app/devices.json
       FASTAPI_URL: http://fastapi:8000
       CREDENTIALS_CSV: /app/credentials.csv
+      INJECTOR_STATE_FILE: /tmp/vantage_injections.json
+      INJECTOR_PORT: "8001"
     volumes:
       - ./simulator:/app
     depends_on:

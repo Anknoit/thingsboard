@@ -1,0 +1,97 @@
+{
+  "description": "MSB-01 power factor degradation — energy meter shows declining PF and rising reactive power, indicating capacitor bank failure. Triggers predictive maintenance work order. Paired with DB-FLOOR1 showing voltage sags to demonstrate downstream impact.",
+  "target_devices": ["MSB-01", "DB-FLOOR1"],
+  "duration_seconds": 540,
+  "steps": [
+    {
+      "start_seconds": 0,
+      "label": "Early PF degradation — within tolerance",
+      "device_overrides": {
+        "MSB-01": {
+          "active_power":   52.5,
+          "reactive_power": 28.4,
+          "current":        142.0,
+          "voltage":        399.2,
+          "power_factor":   0.78,
+          "error_count":    2
+        },
+        "DB-FLOOR1": {
+          "active_power":   18.2,
+          "reactive_power": 9.8,
+          "current":        49.5,
+          "voltage":        397.8,
+          "power_factor":   0.80,
+          "error_count":    1
+        }
+      }
+    },
+    {
+      "start_seconds": 180,
+      "label": "PF below 0.75 — utility penalty zone",
+      "device_overrides": {
+        "MSB-01": {
+          "active_power":   54.1,
+          "reactive_power": 38.2,
+          "current":        156.0,
+          "voltage":        396.5,
+          "power_factor":   0.71,
+          "error_count":    5
+        },
+        "DB-FLOOR1": {
+          "active_power":   19.0,
+          "reactive_power": 14.3,
+          "current":        53.2,
+          "voltage":        394.1,
+          "power_factor":   0.72,
+          "error_count":    3
+        }
+      }
+    },
+    {
+      "start_seconds": 360,
+      "label": "Severe PF degradation — PREDICTIVE_FAILURE imminent",
+      "device_overrides": {
+        "MSB-01": {
+          "active_power":   55.8,
+          "reactive_power": 52.6,
+          "current":        178.0,
+          "voltage":        392.0,
+          "power_factor":   0.60,
+          "error_count":    14
+        },
+        "DB-FLOOR1": {
+          "active_power":   19.8,
+          "reactive_power": 19.2,
+          "current":        61.0,
+          "voltage":        389.5,
+          "power_factor":   0.62,
+          "error_count":    8
+        }
+      }
+    }
+  ],
+  "telemetry_overrides": {
+    "active_power":   55.8,
+    "reactive_power": 52.6,
+    "current":        178.0,
+    "voltage":        392.0,
+    "power_factor":   0.60,
+    "error_count":    14
+  },
+  "expected_alarms": [
+    "ANOMALY_DETECTED",
+    "LOW_POWER_FACTOR",
+    "PREDICTIVE_FAILURE"
+  ],
+  "demo_script": [
+    "1. Inject scenario: POST /inject/motor_prefailure",
+    "2. Open Vantage NMS → Energy Management dashboard",
+    "3. Watch power factor trend on MSB-01 declining below 0.75",
+    "4. Anomaly Detection fires LOW_POWER_FACTOR alarm on MSB-01",
+    "5. Ask Vantage Chat on MSB-01: 'Why is power factor dropping?'",
+    "6. LLM explains capacitor bank failure, estimates utility penalty cost",
+    "7. Auto-created work order: replace 50kVAR capacitor bank (P2, 3hr labour)",
+    "8. Ask about DB-FLOOR1: 'Is the floor distribution board affected?'",
+    "9. Reset: POST /reset"
+  ]
+}

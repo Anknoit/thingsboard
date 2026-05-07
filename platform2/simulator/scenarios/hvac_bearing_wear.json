@@ -1,0 +1,70 @@
+{
+  "description": "AHU-01 bearing wear — progressive vibration and temperature rise leading to PREDICTIVE_FAILURE alarm. Simulates a supply fan bearing degrading over 10 minutes. Watch Vantage Chat for recommended maintenance steps.",
+  "target_devices": ["AHU-01"],
+  "duration_seconds": 600,
+  "steps": [
+    {
+      "start_seconds": 0,
+      "label": "Early wear — subtle vibration increase",
+      "device_overrides": {
+        "AHU-01": {
+          "vibration_rms":     1.2,
+          "current_draw":      4.8,
+          "temperature":       26.5,
+          "fan_speed":         1050,
+          "power_consumption": 3.8,
+          "error_count":       1
+        }
+      }
+    },
+    {
+      "start_seconds": 180,
+      "label": "Moderate wear — anomaly score rising",
+      "device_overrides": {
+        "AHU-01": {
+          "vibration_rms":     2.1,
+          "current_draw":      5.6,
+          "temperature":       31.2,
+          "fan_speed":         980,
+          "power_consumption": 4.5,
+          "error_count":       3
+        }
+      }
+    },
+    {
+      "start_seconds": 360,
+      "label": "Severe wear — PREDICTIVE_FAILURE threshold crossed",
+      "device_overrides": {
+        "AHU-01": {
+          "vibration_rms":     3.8,
+          "current_draw":      7.2,
+          "temperature":       38.5,
+          "fan_speed":         870,
+          "power_consumption": 6.1,
+          "error_count":       8
+        }
+      }
+    }
+  ],
+  "telemetry_overrides": {
+    "vibration_rms":     3.8,
+    "current_draw":      7.2,
+    "temperature":       38.5,
+    "fan_speed":         870,
+    "power_consumption": 6.1,
+    "error_count":       8
+  },
+  "expected_alarms": [
+    "ANOMALY_DETECTED",
+    "PREDICTIVE_FAILURE"
+  ],
+  "demo_script": [
+    "1. Inject scenario: POST /inject/hvac_bearing_wear",
+    "2. Open Vantage NMS dashboard → AHU-01",
+    "3. Watch anomaly score climb on the equipment health card",
+    "4. In Vantage Chat: 'Why is AHU-01 vibration increasing?'",
+    "5. LLM will identify bearing wear and recommend SKF bearing replacement",
+    "6. Vantage WorkOrders widget will show auto-created P2 work order",
+    "7. Reset: POST /reset/AHU-01"
+  ]
+}

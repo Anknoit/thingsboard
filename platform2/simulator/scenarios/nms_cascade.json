@@ -1,0 +1,104 @@
+{
+  "description": "Network cascade — core switch fault causes downstream access switch and server alarms. Tests GNN root cause analysis. SW-CORE-01 fails first, then SW-ACCESS-01 and SW-ACCESS-02 show packet loss and latency spikes, then SRV-APP-01 shows connection errors.",
+  "target_devices": ["SW-CORE-01", "SW-ACCESS-01", "SW-ACCESS-02", "SRV-APP-01"],
+  "duration_seconds": 480,
+  "steps": [
+    {
+      "start_seconds": 0,
+      "label": "Core switch port fault — root cause",
+      "device_overrides": {
+        "SW-CORE-01": {
+          "error_rate":  0.85,
+          "latency":     95.0,
+          "packet_loss": 0.42,
+          "rx_bytes":    180000,
+          "error_count": 45
+        }
+      }
+    },
+    {
+      "start_seconds": 60,
+      "label": "Access switches degrade — downstream impact",
+      "device_overrides": {
+        "SW-CORE-01": {
+          "error_rate":  1.20,
+          "latency":     140.0,
+          "packet_loss": 0.65,
+          "rx_bytes":    95000,
+          "error_count": 72
+        },
+        "SW-ACCESS-01": {
+          "error_rate":  0.45,
+          "latency":     62.0,
+          "packet_loss": 0.18,
+          "rx_bytes":    310000,
+          "error_count": 18
+        },
+        "SW-ACCESS-02": {
+          "error_rate":  0.38,
+          "latency":     55.0,
+          "packet_loss": 0.14,
+          "rx_bytes":    280000,
+          "error_count": 14
+        }
+      }
+    },
+    {
+      "start_seconds": 180,
+      "label": "Application server shows connection errors — blast radius complete",
+      "device_overrides": {
+        "SW-CORE-01": {
+          "error_rate":  1.85,
+          "latency":     220.0,
+          "packet_loss": 0.91,
+          "rx_bytes":    22000,
+          "error_count": 110
+        },
+        "SW-ACCESS-01": {
+          "error_rate":  0.72,
+          "latency":     98.0,
+          "packet_loss": 0.35,
+          "rx_bytes":    140000,
+          "error_count": 38
+        },
+        "SW-ACCESS-02": {
+          "error_rate":  0.68,
+          "latency":     91.0,
+          "packet_loss": 0.31,
+          "rx_bytes":    125000,
+          "error_count": 32
+        },
+        "SRV-APP-01": {
+          "cpu_usage":    92.0,
+          "memory_usage": 88.0,
+          "disk_io":      5.0,
+          "temperature":  71.0,
+          "error_count":  55
+        }
+      }
+    }
+  ],
+  "telemetry_overrides": {
+    "error_rate":  1.85,
+    "latency":     220.0,
+    "packet_loss": 0.91,
+    "rx_bytes":    22000,
+    "error_count": 110
+  },
+  "expected_alarms": [
+    "ANOMALY_DETECTED",
+    "NETWORK_DEGRADATION",
+    "CASCADE_DETECTED"
+  ],
+  "expected_gnn_root_cause": "SW-CORE-01",
+  "demo_script": [
+    "1. Inject scenario: POST /inject/nms_cascade",
+    "2. Open Vantage NMS → Network Operations dashboard",
+    "3. Watch alarms fire on all 4 devices within 2 minutes",
+    "4. GNN cascade analysis fires automatically when 3+ alarms hit in 60s",
+    "5. Root cause card shows SW-CORE-01 with explanation",
+    "6. Ask Vantage Chat on SW-CORE-01: 'What caused this network cascade?'",
+    "7. LLM will describe core switch SFP degradation and blast radius",
+    "8. Reset all: POST /reset"
+  ]
+}
