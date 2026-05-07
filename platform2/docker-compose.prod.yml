@@ -1,0 +1,160 @@
+# docker-compose.prod.yml — Production hardening overlay.
+#
+# Apply on top of docker-compose.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Or via Makefile:
+#   make start  (uses COMPOSE_PROD when PRODUCTION=true)
+#
+# Changes from base:
+#   - Resource limits on every service
+#   - Host-bound ports restricted to localhost only (put Nginx/LB in front)
+#   - Kafka external port removed (internal traffic only)
+#   - PostgreSQL external port removed
+#   - Redis external port removed
+#   - JSON file logging driver with rotation
+#   - FastAPI runs with 4 Uvicorn workers
+#   - Simulator profile excluded (never starts in production)
+
+version: "3.9"
+
+services:
+
+  thingsboard:
+    ports:
+      - "127.0.0.1:8080:9090"   # expose only to localhost — put Nginx in front
+      - "0.0.0.0:1883:1883"     # MQTT must be publicly reachable for devices
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          memory: 1G
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  zookeeper:
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  kafka:
+    ports: []   # remove external 9092 — internal traffic only in production
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          memory: 512M
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  postgres:
+    ports: []   # no external access in production — use 'make shell-db' for access
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          memory: 512M
+    command: >
+      postgres
+        -c max_connections=100
+        -c shared_buffers=256MB
+        -c effective_cache_size=768MB
+        -c work_mem=4MB
+        -c maintenance_work_mem=64MB
+        -c checkpoint_completion_target=0.9
+        -c wal_buffers=16MB
+        -c default_statistics_target=100
+        -c log_min_duration_statement=1000
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  redis:
+    ports: []   # internal only
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 768M
+        reservations:
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  chroma:
+    ports:
+      - "127.0.0.1:8002:8000"   # localhost only
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  fastapi:
+    ports:
+      - "127.0.0.1:8000:8000"   # localhost only — Nginx terminates TLS externally
+    command: >
+      uvicorn main:app
+        --host 0.0.0.0
+        --port 8000
+        --workers 4
+        --loop uvloop
+        --http h11
+        --no-access-log
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          memory: 1G
+    volumes:
+      # Read-only mounts for source — models dir stays writable for training
+      - ./fastapi:/app:ro
+      - ./models:/app/models
+      - ./knowledge_base:/app/knowledge_base:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "10"
+    environment:
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
