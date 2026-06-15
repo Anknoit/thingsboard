@@ -1,5 +1,5 @@
 """
-seed.py — Index documents into ChromaDB for Vantage Chat RAG pipeline.
+seed.py — Index documents into ChromaDB for NavNet Chat RAG pipeline.
 
 Usage:
   # Index a directory of PDFs
@@ -166,7 +166,7 @@ def index_fault_csv(path: Path, collection: chromadb.Collection) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Seed ChromaDB knowledge base for Vantage Chat"
+        description="Seed ChromaDB knowledge base for NavNet Chat"
     )
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--dir", help="Directory of files to index")

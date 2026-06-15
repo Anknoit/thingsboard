@@ -1,5 +1,5 @@
 """
-locustfile.py — Vantage NMS load test.
+locustfile.py — NavNet load test.
 
 Tests three workload types that an operator generates:
   1. Chat queries  — POST /chat (SSE, consume full stream)
@@ -68,7 +68,7 @@ DEVICE_CLASSES = ["hvac", "energy", "network", "infra"]
 
 class OperatorUser(HttpUser):
     """
-    Simulates an operator browsing the Vantage NMS dashboard.
+    Simulates an operator browsing the NavNet dashboard.
     Ratio: 1 chat : 3 workorder lists : 2 webhook deliveries
     """
 
@@ -185,7 +185,7 @@ class OperatorUser(HttpUser):
             else:
                 resp.failure(f"Unexpected status: {resp.status_code}")
 
-    # ── Webhook (simulates ThingsBoard rule chain) ────────────────────────────
+    # ── Webhook (simulates NavNet Registry rule chain) ────────────────────────────
 
     @task(2)
     def alarm_webhook(self) -> None:
@@ -261,7 +261,7 @@ def on_quitting(environment, **kwargs) -> None:
     stats = environment.stats
 
     print("\n" + "=" * 60)
-    print("Vantage NMS Load Test — Summary")
+    print("NavNet Load Test — Summary")
     print("=" * 60)
 
     key_endpoints = ["/chat (SSE)", "/workorders (list)", "/webhook/alarm", "/health"]

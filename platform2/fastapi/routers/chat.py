@@ -1,9 +1,9 @@
 """
-POST /chat — Vantage Chat SSE streaming endpoint.
+POST /chat — NavNet Chat SSE streaming endpoint.
 
 Flow:
   1. Rate-limit check (10 req/min per entity_id via Redis sliding window)
-  2. Build device context (ThingsBoard data + widget context)
+  2. Build device context (NavNet Registry data + widget context)
   3. Retrieve RAG documents from ChromaDB
   4. Build system prompt
   5. Stream LLM response token-by-token via SSE
@@ -230,7 +230,7 @@ async def _chat_stream(body: ChatRequest) -> asyncio.AsyncGenerator[str, None]:
 @router.post("/chat")
 async def chat(body: ChatRequest) -> StreamingResponse:
     """
-    Vantage Chat — streams AI-generated device diagnosis and resolution steps.
+    NavNet Chat — streams AI-generated device diagnosis and resolution steps.
 
     Response is text/event-stream (SSE):
       data: {"type": "token",      "content": "..."}   — LLM token

@@ -9,10 +9,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # ── ThingsBoard ───────────────────────────────────────────────────────────
-    tb_url: str = "http://localhost:8080"
-    tb_admin_user: str = "tenant@thingsboard.org"
-    tb_admin_password: str = "changeme"
+    # ── NavNet Registry ───────────────────────────────────────────────────────
+    registry_url: str = "http://localhost:8080"
+    registry_admin_user: str = "admin@navnet.local"
+    registry_admin_password: str = "changeme"
     jwt_expiry_seconds: int = 9000  # 2.5 hours
 
     # ── FastAPI ───────────────────────────────────────────────────────────────
@@ -30,11 +30,11 @@ class Settings(BaseSettings):
 
     # ── Kafka ─────────────────────────────────────────────────────────────────
     kafka_bootstrap: str = "localhost:9092"
-    kafka_topics_bms_hvac: str = "tb.telemetry.bms.hvac"
-    kafka_topics_bms_energy: str = "tb.telemetry.bms.energy"
-    kafka_topics_bms_other: str = "tb.telemetry.bms.other"
-    kafka_topics_nms_network: str = "tb.telemetry.nms.network"
-    kafka_topics_nms_infra: str = "tb.telemetry.nms.infra"
+    kafka_topics_bms_hvac: str = "navnet.telemetry.bms.hvac"
+    kafka_topics_bms_energy: str = "navnet.telemetry.bms.energy"
+    kafka_topics_bms_other: str = "navnet.telemetry.bms.other"
+    kafka_topics_nms_network: str = "navnet.telemetry.nms.network"
+    kafka_topics_nms_infra: str = "navnet.telemetry.nms.infra"
 
     # ── PostgreSQL ────────────────────────────────────────────────────────────
     postgres_url: str = "postgresql+asyncpg://p2:changeme@localhost:5432/platform2"
@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     # ── ChromaDB ──────────────────────────────────────────────────────────────
     chroma_host: str = "localhost"
     chroma_port: int = 8001
-    chroma_collection: str = "platform2_kb"
+    chroma_collection: str = "navnet_kb"
 
     # ── Anomaly detection ─────────────────────────────────────────────────────
     anomaly_sigma_threshold: float = 3.4

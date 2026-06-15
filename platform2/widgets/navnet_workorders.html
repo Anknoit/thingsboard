@@ -1,6 +1,6 @@
 <!--
-  Vantage WorkOrders — ThingsBoard Custom Widget
-  Paste the entire contents of this file into the ThingsBoard widget HTML tab.
+  NavNet WorkOrders — NavNet Widget
+  Paste the entire contents of this file into the NavNet widget editor HTML tab.
 
   Widget settings schema (add in "Settings" tab of widget editor):
     FASTAPI_URL  (string, required)  e.g. http://localhost:8000
@@ -226,7 +226,7 @@
 <div id="vwo-root">
   <div id="vwo-header">
     <h3>
-      Vantage WorkOrders
+      NavNet WorkOrders
       <span id="vwo-badge">0</span>
     </h3>
     <button id="vwo-refresh-btn" title="Refresh">↻</button>
@@ -446,7 +446,7 @@
 
   document.getElementById('vwo-refresh-btn').addEventListener('click', load);
 
-  // ── ThingsBoard lifecycle ─────────────────────────────────────────────────
+  // ── NavNet lifecycle ─────────────────────────────────────────────────
 
   self.onInit = function () {
     const ctx = self.ctx;

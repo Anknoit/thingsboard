@@ -12,7 +12,7 @@ from aiokafka.errors import KafkaConnectionError
 
 from config import settings
 from models.schemas import HealthResponse, ServiceHealth
-from services.tb_client import get_tb_client
+from services.registry_client import get_registry_client
 
 router = APIRouter(tags=["health"])
 
@@ -46,7 +46,7 @@ async def _check_chroma() -> ServiceHealth:
         t0 = time.monotonic()
         async with httpx.AsyncClient(timeout=5) as client:
             resp = await client.get(
-                f"http://{settings.chroma_host}:{settings.chroma_port}/api/v1/heartbeat"
+                f"http://{settings.chroma_host}:{settings.chroma_port}/api/v2/heartbeat"
             )
             resp.raise_for_status()
         return ServiceHealth(status="ok", latency_ms=round((time.monotonic() - t0) * 1000, 1))
@@ -65,10 +65,10 @@ async def _check_kafka() -> ServiceHealth:
         return ServiceHealth(status="down", detail=str(exc))
 
 
-async def _check_thingsboard() -> ServiceHealth:
+async def _check_registry() -> ServiceHealth:
     try:
         t0 = time.monotonic()
-        ok = await get_tb_client().health_check()
+        ok = await get_registry_client().health_check()
         latency = round((time.monotonic() - t0) * 1000, 1)
         return ServiceHealth(status="ok" if ok else "down", latency_ms=latency)
     except Exception as exc:
@@ -82,7 +82,7 @@ async def health() -> HealthResponse:
         _check_redis(),
         _check_chroma(),
         _check_kafka(),
-        _check_thingsboard(),
+        _check_registry(),
         return_exceptions=False,
     )
     services = {
@@ -90,7 +90,7 @@ async def health() -> HealthResponse:
         "redis": checks[1],
         "chroma": checks[2],
         "kafka": checks[3],
-        "thingsboard": checks[4],
+        "registry": checks[4],
     }
     overall = "ok" if all(s.status == "ok" for s in services.values()) else "degraded"
     return HealthResponse(status=overall, services=services)

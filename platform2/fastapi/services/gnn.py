@@ -46,7 +46,7 @@ from services.topology import get_topology
 
 logger = logging.getLogger(__name__)
 
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "models", "gnn_rootcause.pth")
+MODEL_PATH = "/trained_models/gnn_rootcause.pth"
 
 # Device class → integer index for node features
 DEVICE_CLASS_IDX: dict[str, int] = {

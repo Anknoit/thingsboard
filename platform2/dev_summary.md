@@ -3,7 +3,7 @@
                                                                                                                                                                                        
   docker-compose.yml                                                                                                                                                                   
                                                                                                                                                                                        
-  Defines the entire 7-service stack: ThingsBoard CE (device registry + rule engine + UI), Apache Kafka + Zookeeper (message bus), TimescaleDB/PostgreSQL (time-series + relational    
+  Defines the entire 7-service stack: NavNet Registry CE (device registry + rule engine + UI), Apache Kafka + Zookeeper (message bus), TimescaleDB/PostgreSQL (time-series + relational    
   DB), Redis (cache), ChromaDB (vector store), FastAPI (AI services), and the Simulator (demo-only profile). All services share a bridge network (platform2-net) with named volumes for
    persistence.                                                                                                                                                                        
                                                             
@@ -14,12 +14,12 @@
                                                                                                                                                                                        
   scripts/init-multiple-dbs.sh                              
 
-  PostgreSQL init script that runs on first container start. Creates two databases (thingsboard for the device registry, platform2 for Vantage NMS) and a dedicated p2 user with the   
+  PostgreSQL init script that runs on first container start. Creates two databases (thingsboard for the device registry, platform2 for NavNet) and a dedicated p2 user with the   
   TimescaleDB extension enabled.
                                                                                                                                                                                        
   scripts/onboard_devices.py                                
 
-  Bulk device registration script. Reads a CSV of device names/classes/locations, calls the ThingsBoard REST API to create devices, assigns them to an asset hierarchy (Site → BMS /   
+  Bulk device registration script. Reads a CSV of device names/classes/locations, calls the NavNet Registry REST API to create devices, assigns them to an asset hierarchy (Site → BMS /   
   NMS → device type), and writes MQTT access tokens to credentials.csv for the simulator.
                                                                                                                                                                                        
   scripts/devices_sample.csv                                                                                                                                                           
@@ -28,12 +28,12 @@
                                                             
   rule_chains/telemetry_routing.json                                                                                                                                                   
                                                             
-  ThingsBoard rule chain that reads the device_class attribute on each incoming telemetry message and routes it to the correct Kafka topic (platform2.hvac, platform2.energy,          
+  NavNet Registry rule chain that reads the device_class attribute on each incoming telemetry message and routes it to the correct Kafka topic (platform2.hvac, platform2.energy,          
   platform2.network, platform2.infra, platform2.other). The FastAPI Kafka consumer subscribes to all five.
                                                                                                                                                                                        
   rule_chains/alarm_webhook.json                            
 
-  ThingsBoard rule chain that fires on every alarm lifecycle event (created, updated, cleared). Sends a POST to /webhook/alarm and /webhook/cascade on the FastAPI service so AI       
+  NavNet Registry rule chain that fires on every alarm lifecycle event (created, updated, cleared). Sends a POST to /webhook/alarm and /webhook/cascade on the FastAPI service so AI       
   enrichment runs immediately without polling.
                                                                                                                                                                                        
   fastapi/config.py                                         
@@ -62,11 +62,11 @@
 
   Alembic configuration pointing to the async migration environment.
 
-  fastapi/services/tb_client.py                                                                                                                                                        
+  fastapi/services/registry_client.py                                                                                                                                                        
   
-  Async HTTP wrapper around the ThingsBoard REST API. Handles JWT login, token refresh on 401, and 3-attempt exponential backoff (1s → 2s → 4s) on every request. Exposes:             
+  Async HTTP wrapper around the NavNet Registry REST API. Handles JWT login, token refresh on 401, and 3-attempt exponential backoff (1s → 2s → 4s) on every request. Exposes:             
   get_device(), get_device_attributes(), get_latest_telemetry(), get_telemetry() (historical with time range), get_alarms(), create_alarm(), update_alarm_attributes(),
-  set_device_server_attributes(). Module-level singleton via get_tb_client().                                                                                                          
+  set_device_server_attributes(). Module-level singleton via get_registry_client().                                                                                                          
                                                             
   fastapi/requirements.txt
 
@@ -97,12 +97,12 @@
                                                                                                                                                                                        
   fastapi/routers/health.py                                 
                                                                                                                                                                                        
-  GET /health — runs parallel async checks against all 6 downstream services (PostgreSQL, Redis, ChromaDB, Kafka, ThingsBoard, LLM provider) and returns a structured HealthResponse   
+  GET /health — runs parallel async checks against all 6 downstream services (PostgreSQL, Redis, ChromaDB, Kafka, NavNet Registry, LLM provider) and returns a structured HealthResponse   
   with per-service status, loaded model list, and overall healthy | degraded | unhealthy status.
                                                                                                                                                                                        
   fastapi/routers/webhook.py                                                                                                                                                           
   
-  POST /webhook/alarm — receives ThingsBoard alarm events. Uses Redis SET NX (60s TTL) for dedup, fires _enrich_alarm_bg background task (fetches telemetry, scores with Isolation     
+  POST /webhook/alarm — receives NavNet Registry alarm events. Uses Redis SET NX (60s TTL) for dedup, fires _enrich_alarm_bg background task (fetches telemetry, scores with Isolation     
   Forest, writes ai_anomaly_score / ai_sigma / ai_explanation back to the device as server attributes). Feeds the in-process cascade accumulator.
                                                                                                                                                                                        
   POST /webhook/cascade — feeds the same cascade accumulator directly. When the buffer hits the configured threshold within the time window, fires _analyze_cascade_bg which collects  
@@ -148,8 +148,8 @@
                                                                                                                                                                                        
   fastapi/services/context_builder.py                                                                                                                                                  
                                                                                                                                                                                        
-  Assembles device context for each chat request by fetching from ThingsBoard: latest telemetry values, 48-hour historical trends (min/max/mean/trend direction per key), active alarms
-   (up to 5), and device attributes (name, class, floor, zone, firmware). Results are cached in Redis for 30 seconds per device to avoid hammering ThingsBoard on rapid follow-up
+  Assembles device context for each chat request by fetching from NavNet Registry: latest telemetry values, 48-hour historical trends (min/max/mean/trend direction per key), active alarms
+   (up to 5), and device attributes (name, class, floor, zone, firmware). Results are cached in Redis for 30 seconds per device to avoid hammering NavNet Registry on rapid follow-up
   questions.                                                                                                                                                                           
                                                             
   fastapi/services/prompt_builder.py
@@ -178,14 +178,14 @@
   ---                                                       
   Phase 4 — Custom Widgets (Days 10–11)
                                                                                                                                                                                        
-  widgets/vantage_chat.html
+  widgets/navnet_chat.html
                                                                                                                                                                                        
-  Vanilla HTML/JS widget for the ThingsBoard dashboard. On init, reads entity_id and FASTAPI_URL from the widget context. Displays a live telemetry strip (up to 6 pills showing       
+  Vanilla HTML/JS widget for the NavNet Registry dashboard. On init, reads entity_id and FASTAPI_URL from the widget context. Displays a live telemetry strip (up to 6 pills showing       
   current values). Chat input supports Ctrl+Enter shortcut and auto-resizes. Messages stream via fetch() + ReadableStream (not EventSource, which doesn't support POST). Shows a 3-dot
   typing animation during the streaming phase. Renders LLM tokens with basic markdown (bold, italic, inline code, bullet points). When the stream contains a work_order event, renders 
   a structured work order card. A copy button appears on completion. All state is reset cleanly on widget destroy.
 
-  widgets/vantage_workorders.html
+  widgets/navnet_workorders.html
 
   Vanilla HTML/JS widget showing the maintenance queue for the current device. Fetches GET /workorders?entity_id=…&status=open,acknowledged,in_progress and renders priority cards     
   (P1–P5 with colour coding). Each card shows fault description, due date, labour hours, and a status dropdown. Submitting a status change calls PATCH /workorders/{id}/status. Overdue
@@ -193,7 +193,7 @@
                                                             
   widgets/WIDGET_REGISTRATION.md                                                                                                                                                       
   
-  Step-by-step instructions for registering both widgets in the ThingsBoard widget library: create widget bundle, paste HTML, configure the settings schema JSON (which exposes        
+  Step-by-step instructions for registering both widgets in the NavNet Registry widget library: create widget bundle, paste HTML, configure the settings schema JSON (which exposes        
   FASTAPI_URL as a user-configurable field), and verification checklist.
                                                                                                                                                                                        
   ---                                                       
@@ -209,19 +209,19 @@
 
   Full Kafka consumer replacing the stub. Uses AIOKafkaConsumer with manual commit (enable_auto_commit=False) and AIOKafkaProducer for the dead-letter queue (platform2.dlq). For each 
   message: deserialises JSON → scores with Isolation Forest (via run_in_executor to avoid blocking the event loop) → writes AnomalyScore row to TimescaleDB → if anomaly:
-  creates/enriches a ThingsBoard alarm with severity mapped from score (≥80=CRITICAL, ≥60=MAJOR, ≥40=WARNING) → uses Redis to dedup alarms already enriched by the webhook path. Failed
+  creates/enriches a NavNet Registry alarm with severity mapped from score (≥80=CRITICAL, ≥60=MAJOR, ≥40=WARNING) → uses Redis to dedup alarms already enriched by the webhook path. Failed
    messages (parse errors, scoring errors) go to the DLQ with a failure reason header; the consumer continues processing.
 
   scripts/train_anomaly.py                                                                                                                                                             
   
-  Training script for production use. Connects to ThingsBoard via sync HTTP client, pages all tenant devices, filters by device_class, fetches up to 10,000 historical telemetry       
+  Training script for production use. Connects to NavNet Registry via sync HTTP client, pages all tenant devices, filters by device_class, fetches up to 10,000 historical telemetry       
   readings per device (last 30 days), and trains the Isolation Forest for each class. Validates the trained model against a known anomaly sample before saving.
                                                                                                                                                                                        
   scripts/generate_synthetic_baseline.py                                                                                                                                               
    
   Pre-seeding script for day-1 use before real data exists. Generates 30 days of synthetic telemetry at 5-minute intervals for all device classes using time-of-day sinusoidal patterns
    and business-hours modifiers. Injects 3 realistic anomalies per class at random timestamps. Trains Isolation Forest models from the synthetic data, validates detection against a
-  fresh anomaly sample and a normal sample, and optionally publishes historical telemetry to ThingsBoard via the REST batch ingestion API (with explicit timestamps).                  
+  fresh anomaly sample and a normal sample, and optionally publishes historical telemetry to NavNet Registry via the REST batch ingestion API (with explicit timestamps).                  
                                                             
   ---
   Phase 6 — Predictive Maintenance (Days 15–16)
@@ -234,7 +234,7 @@
   train() — fits a MinMaxScaler on the training data, builds overlapping windows, and trains with BCELoss. Addresses class imbalance with BCEWithLogitsLoss(pos_weight=n_neg/n_pos).   
   Saves the model state dict (.pth) and scaler + feature names (.pkl) separately.
                                                                                                                                                                                        
-  score_device() — fetches the last 26 hours of telemetry from ThingsBoard, takes the most recent 24 readings, scales them, runs inference, and maps probability to a failure window:  
+  score_device() — fetches the last 26 hours of telemetry from NavNet Registry, takes the most recent 24 readings, scales them, runs inference, and maps probability to a failure window:  
   ≥0.90 → "24hr", ≥0.80 → "48hr", else "72hr".
                                                                                                                                                                                        
   generate_work_order_data() — uses WO_TEMPLATES (per-class: parts list with stock codes, safety prerequisites, skill level, labour hours) to generate a structured work order when    
@@ -244,8 +244,8 @@
    
   fastapi/services/predictive_batch.py                                                                                                                                                 
                                                             
-  Daily batch job scheduled by APScheduler. Pages all ThingsBoard devices, filters to BMS device classes (hvac/energy/occupancy/elevator/fire), and runs LSTM scoring concurrently with
-   a Semaphore(10) limit. For each device above threshold: checks Redis 48-hour dedup key to prevent duplicate alarms → creates PREDICTIVE_FAILURE alarm in ThingsBoard → writes LSTM
+  Daily batch job scheduled by APScheduler. Pages all NavNet Registry devices, filters to BMS device classes (hvac/energy/occupancy/elevator/fire), and runs LSTM scoring concurrently with
+   a Semaphore(10) limit. For each device above threshold: checks Redis 48-hour dedup key to prevent duplicate alarms → creates PREDICTIVE_FAILURE alarm in NavNet Registry → writes LSTM
   scores as server attributes → creates work order in PostgreSQL with due_by set to end of the predicted failure window. Returns a summary dict (devices_scored, failures_predicted,   
   alarms_created, work_orders_created, errors).             
 
@@ -261,8 +261,8 @@
                                             
   fastapi/services/topology.py
                                                                                                                                                                                        
-  Builds and maintains a NetworkX DiGraph representing all device relationships. async_build() pages all ThingsBoard devices, fetches their relation lists in both directions (FROM and
-   TO), and maps ThingsBoard relation types to 5 typed edges: contains, handover, power_dependency, network_adjacency, hvac_zone. Also infers implicit edges from device_class         
+  Builds and maintains a NetworkX DiGraph representing all device relationships. async_build() pages all NavNet Registry devices, fetches their relation lists in both directions (FROM and
+   TO), and maps NavNet Registry relation types to 5 typed edges: contains, handover, power_dependency, network_adjacency, hvac_zone. Also infers implicit edges from device_class         
   co-location (e.g. energy→hvac on the same floor = power_dependency). Persists as gpickle. get_subgraph(entity_ids, hops=2) returns the neighbourhood of any set of devices for GNN   
   input. stats() returns node/edge counts by type. Module-level singleton via get_topology().
 
@@ -353,7 +353,7 @@
   Production overlay applied on top of docker-compose.yml. Changes:                                                                                                                    
   - All service ports restricted to 127.0.0.1 (reverse proxy termination in front)
   - Kafka, PostgreSQL, Redis external ports removed entirely (internal traffic only)                                                                                                   
-  - CPU and memory limits on every service (ThingsBoard: 2GB, FastAPI: 2GB, Kafka: 1GB, PostgreSQL: 1GB)
+  - CPU and memory limits on every service (NavNet Registry: 2GB, FastAPI: 2GB, Kafka: 1GB, PostgreSQL: 1GB)
   - PostgreSQL tuned with shared_buffers, work_mem, checkpoint_completion_target, slow query logging                                                                                   
   - FastAPI runs with 4 Uvicorn workers (--workers 4) with uvloop                                                                                                                      
   - FastAPI source directory mounted read-only; only models/ remains writable                                                                                                          
@@ -370,6 +370,6 @@
   5. AI model training — live data path vs synthetic baseline, individual model targets, timing estimates                                                                              
   6. Knowledge base — adding PDFs/text, make seed-knowledge, make seed-faults                                                                                                          
   7. Day-2 operations — health check, log tailing, backup commands, cron example, retraining cadence                                                                                   
-  8. Vantage Chat guide — example questions, what the AI does with each, tips                                                                                                          
-  9. Vantage WorkOrders guide — lifecycle states, priority colour table, overdue handling                                                                                              
+  8. NavNet Chat guide — example questions, what the AI does with each, tips                                                                                                          
+  9. NavNet WorkOrders guide — lifecycle states, priority colour table, overdue handling                                                                                              
   10. Troubleshooting — 5 common failure modes with diagnostic commands, demo mode walkthrough with make inject SCENARIO=…   

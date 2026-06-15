@@ -1,5 +1,5 @@
 """
-Webhook receivers from ThingsBoard rule chains.
+Webhook receivers from NavNet Registry rule chains.
 
 POST /webhook/alarm   — single alarm created
 POST /webhook/cascade — potential cascade (3+ alarms in 60s window)
@@ -18,7 +18,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 
 from config import settings
 from models.schemas import AlarmWebhookPayload, CascadeWebhookPayload, WebhookAck
-from services.tb_client import TBClient, get_tb_client
+from services.registry_client import RegistryClient, get_registry_client
 
 logger = logging.getLogger(__name__)
 
@@ -38,10 +38,10 @@ async def _get_redis() -> aioredis.Redis:
 
 # ── Background: enrich alarm with anomaly score ──────────────────────────────
 
-async def _enrich_alarm_bg(payload: AlarmWebhookPayload, tb: TBClient) -> None:
+async def _enrich_alarm_bg(payload: AlarmWebhookPayload, tb: RegistryClient) -> None:
     """
     Background task: score the alarm with the anomaly service and write
-    AI attributes back to the device in ThingsBoard.
+    AI attributes back to the device in NavNet Registry.
     Runs after 200 is already returned to the caller.
     """
     try:
@@ -78,10 +78,10 @@ async def _enrich_alarm_bg(payload: AlarmWebhookPayload, tb: TBClient) -> None:
 
 # ── Background: GNN cascade root-cause analysis ───────────────────────────────
 
-async def _analyze_cascade_bg(alarm_entries: list[dict], tb: TBClient) -> None:
+async def _analyze_cascade_bg(alarm_entries: list[dict], tb: RegistryClient) -> None:
     """
     Background task: run GNN root-cause analysis and write results back to
-    all cascade alarms in ThingsBoard.
+    all cascade alarms in NavNet Registry.
     """
     try:
         from services.anomaly import get_anomaly_service
@@ -164,7 +164,7 @@ async def _analyze_cascade_bg(alarm_entries: list[dict], tb: TBClient) -> None:
 
 # ── Prune old cascade buffer entries ─────────────────────────────────────────
 
-async def _maybe_trigger_cascade(new_entry: dict, tb: TBClient, tasks: BackgroundTasks) -> None:
+async def _maybe_trigger_cascade(new_entry: dict, tb: RegistryClient, tasks: BackgroundTasks) -> None:
     """Add alarm to cascade buffer; fire GNN analysis if threshold met."""
     now = time.time()
     window = settings.cascade_window_seconds
@@ -198,10 +198,10 @@ async def _maybe_trigger_cascade(new_entry: dict, tb: TBClient, tasks: Backgroun
 async def alarm_webhook(
     payload: AlarmWebhookPayload,
     background_tasks: BackgroundTasks,
-    tb: TBClient = Depends(get_tb_client),
+    tb: RegistryClient = Depends(get_registry_client),
 ) -> WebhookAck:
     """
-    Receives ThingsBoard alarm events. Returns 200 immediately.
+    Receives NavNet Registry alarm events. Returns 200 immediately.
     Background: scores anomaly and writes ai_* attributes back to device.
     """
     redis = await _get_redis()
@@ -248,10 +248,10 @@ async def alarm_webhook(
 async def cascade_webhook(
     payload: CascadeWebhookPayload,
     background_tasks: BackgroundTasks,
-    tb: TBClient = Depends(get_tb_client),
+    tb: RegistryClient = Depends(get_registry_client),
 ) -> WebhookAck:
     """
-    Explicit cascade signal from ThingsBoard rule chain counter node.
+    Explicit cascade signal from NavNet Registry rule chain counter node.
     Also feeds individual alarm into cascade accumulator.
     """
     entry = {

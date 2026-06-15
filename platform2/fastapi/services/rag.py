@@ -32,6 +32,8 @@ def _get_chroma_client() -> chromadb.HttpClient:
     return chromadb.HttpClient(
         host=settings.chroma_host,
         port=settings.chroma_port,
+        tenant=chromadb.DEFAULT_TENANT,
+        database=chromadb.DEFAULT_DATABASE,
     )
 
 

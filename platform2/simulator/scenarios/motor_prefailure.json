@@ -85,10 +85,10 @@
   ],
   "demo_script": [
     "1. Inject scenario: POST /inject/motor_prefailure",
-    "2. Open Vantage NMS → Energy Management dashboard",
+    "2. Open NavNet → Energy Management dashboard",
     "3. Watch power factor trend on MSB-01 declining below 0.75",
     "4. Anomaly Detection fires LOW_POWER_FACTOR alarm on MSB-01",
-    "5. Ask Vantage Chat on MSB-01: 'Why is power factor dropping?'",
+    "5. Ask NavNet Chat on MSB-01: 'Why is power factor dropping?'",
     "6. LLM explains capacitor bank failure, estimates utility penalty cost",
     "7. Auto-created work order: replace 50kVAR capacitor bank (P2, 3hr labour)",
     "8. Ask about DB-FLOOR1: 'Is the floor distribution board affected?'",

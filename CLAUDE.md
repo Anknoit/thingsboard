@@ -155,10 +155,10 @@ thingsboard/
 
 
 
-# What we are develioping 
-# CLAUDE.md — Vantage NMS Development Instructions
+# What we are developing
+# CLAUDE.md — NavNet Development Instructions
 
-> This file governs all AI-assisted development for **Vantage NMS** — Tasaar's IoT Operations
+> This file governs all AI-assisted development for **NavNet** — Tasaar's IoT Operations
 > Intelligence Platform. Every response, every file generated, every decision made must follow
 > the rules in this document without exception. Read this file completely before touching any code.
 
@@ -168,30 +168,25 @@ thingsboard/
 
 | Attribute | Value |
 |---|---|
-| **Product name** | Vantage NMS |
+| **Product name** | NavNet |
 | **Company** | Tasaar |
-| **Full name (formal)** | Tasaar Vantage NMS |
+| **Full name (formal)** | Tasaar NavNet |
 | **tagline** | *See everything. Fix anything.* |
 | **Internal codename** | platform2 (repository / Docker / env vars only) |
 
 ### Naming rules — enforced everywhere
 
-- The user-facing product is always called **Vantage NMS** — never "ThingsBoard", never "the IoT platform", never "Platform 2"
-- ThingsBoard CE is an **internal implementation detail**. It is never referenced in:
+- The user-facing product is always called **NavNet** — never the underlying registry platform name, never "the IoT platform", never "Platform 2"
+- The device registry platform is an **internal implementation detail**. It is never referenced in:
   - Any UI text, widget labels, or dashboard titles
   - Documentation delivered to customers
   - Error messages visible to operators
   - API response bodies
   - Log lines that could surface in a UI
-- ThingsBoard CE **may** be referenced in:
-  - Internal developer documentation (`/docs/internal/`)
-  - This `CLAUDE.md` file
-  - Docker Compose service names (internal only)
-  - Comments in `tb_client.py`
-- The two custom widgets are **Vantage Chat** and **Vantage WorkOrders** — never "custom widget" or "Chat-to-Fix widget"
-- The AI Chat feature is called **Vantage Chat** in all user-facing text
-- Work order feature is called **Vantage WorkOrders**
-- The AI enrichment on alarms is called **Vantage Intelligence**
+- The two custom widgets are **NavNet Chat** and **NavNet WorkOrders** — never "custom widget" or "Chat-to-Fix widget"
+- The AI Chat feature is called **NavNet Chat** in all user-facing text
+- Work order feature is called **NavNet WorkOrders**
+- The AI enrichment on alarms is called **NavNet Intelligence**
 
 ---
 
@@ -231,7 +226,7 @@ Never suggest alternatives to these. Never upgrade major versions without explic
 ### Infrastructure
 | Service | Image |
 |---|---|
-| Device registry | `thingsboard/tb-postgres` (internal — branded as Vantage NMS) |
+| Device registry | `thingsboard/tb-postgres` (internal — branded as NavNet) |
 | Message bus | `confluentinc/cp-kafka` |
 | Primary database | `timescale/timescaledb` |
 | Cache | `redis:alpine` |
@@ -240,8 +235,8 @@ Never suggest alternatives to these. Never upgrade major versions without explic
 
 ### Widgets
 - Vanilla HTML + JavaScript only — no framework, no npm, no build step
-- Pasted directly into ThingsBoard widget editor
-- Must match ThingsBoard Material Design aesthetic
+- Pasted directly into NavNet widget editor
+- Must match NavNet Material Design aesthetic
 
 ---
 
@@ -267,9 +262,9 @@ vantage-nms/
 │   ├── config.py                    ← pydantic-settings BaseSettings
 │   ├── routers/
 │   │   ├── __init__.py
-│   │   ├── chat.py                  ← Vantage Chat SSE endpoint
+│   │   ├── chat.py                  ← NavNet Chat SSE endpoint
 │   │   ├── webhook.py               ← alarm enrichment + cascade trigger
-│   │   ├── workorders.py            ← Vantage WorkOrders CRUD
+│   │   ├── workorders.py            ← NavNet WorkOrders CRUD
 │   │   └── health.py
 │   ├── services/
 │   │   ├── __init__.py
@@ -281,7 +276,7 @@ vantage-nms/
 │   │   ├── predictive.py            ← LSTM service + batch job
 │   │   ├── gnn.py                   ← GNN root cause service
 │   │   ├── topology.py              ← NetworkX topology graph
-│   │   └── tb_client.py             ← ThingsBoard REST API wrapper
+│   │   └── registry_client.py             ← NavNet Registry API wrapper
 │   ├── consumers/
 │   │   ├── __init__.py
 │   │   └── telemetry.py             ← Kafka consumer → anomaly scorer
@@ -303,8 +298,8 @@ vantage-nms/
 │       └── test_gnn.py
 │
 ├── widgets/
-│   ├── vantage_chat.html            ← Vantage Chat widget
-│   └── vantage_workorders.html      ← Vantage WorkOrders widget
+│   ├── navnet_chat.html            ← NavNet Chat widget
+│   └── navnet_workorders.html      ← NavNet WorkOrders widget
 │
 ├── simulator/
 │   ├── Dockerfile
@@ -340,7 +335,7 @@ vantage-nms/
     ├── internal/                    ← developer docs (TB references allowed here)
     │   ├── architecture.md
     │   ├── kafka_topics.md
-    │   └── tb_integration.md
+    │   └── registry_integration.md
     └── customer/                    ← customer-facing docs (no TB references)
         └── operator_guide.md
 ```
@@ -424,7 +419,7 @@ async def create_resource(
 - Is injected into routers via a Depends() factory function
 - Has an async def health_check() -> bool method
 - Has no direct database calls — uses repository functions from db/postgres.py
-- Has no direct HTTP calls — uses tb_client.py for ThingsBoard, llm_adapter.py for LLM
+- Has no direct HTTP calls — uses registry_client.py for NavNet Registry, llm_adapter.py for LLM
 - Raises domain-specific exceptions (VantageAnomalyError, VantageLLMError, etc.)
 
 # Service singleton pattern:
@@ -437,7 +432,7 @@ async def get_anomaly_service(request: Request) -> AnomalyService:
 ```python
 # exceptions.py — all custom exceptions
 class VantageError(Exception):
-    """Base exception for all Vantage NMS errors."""
+    """Base exception for all NavNet errors."""
     pass
 
 class VantageLLMError(VantageError):
@@ -445,7 +440,7 @@ class VantageLLMError(VantageError):
     pass
 
 class VantageDeviceNotFoundError(VantageError):
-    """Device entity_id not found in Vantage NMS registry."""
+    """Device entity_id not found in NavNet registry."""
     pass
 
 class VantageRAGError(VantageError):
@@ -497,13 +492,13 @@ logger.info(
 @pytest.mark.asyncio
 async def test_chat_returns_sse_stream_for_valid_device(
     async_client: httpx.AsyncClient,
-    mock_tb_client: MagicMock,
+    mock_registry_client: MagicMock,
     mock_llm_adapter: MagicMock,
 ):
     """Chat endpoint streams tokens for a valid entity_id and question."""
     ...
 
-# All external calls (ThingsBoard, LLM, Kafka) are mocked in tests
+# All external calls (NavNet Registry, LLM, Kafka) are mocked in tests
 # Use pytest fixtures in conftest.py — never mock inside test functions
 # Tests must not require a running database — use SQLite in-memory for unit tests
 ```
@@ -515,9 +510,9 @@ async def test_chat_returns_sse_stream_for_valid_device(
 ### 5.1 Separation of concerns
 
 ```
-Device data ownership:     ThingsBoard CE (internal)
+Device data ownership:     NavNet Registry (internal)
 AI inference ownership:    FastAPI services
-UI ownership:              ThingsBoard CE dashboards + 2 custom widgets
+UI ownership:              NavNet Registry dashboards + 2 custom widgets
 Persistence ownership:     PostgreSQL (work orders, audit, health scores)
                            Chroma (vector embeddings)
                            Redis (ephemeral cache only)
@@ -525,8 +520,8 @@ Persistence ownership:     PostgreSQL (work orders, audit, health scores)
 
 - **FastAPI never renders UI** — it is a pure API backend
 - **Widgets never contain business logic** — they call FastAPI and render results
-- **ThingsBoard never calls AI models directly** — it calls FastAPI webhooks
-- **AI services never query ThingsBoard directly** — they use `tb_client.py` only
+- **NavNet Registry never calls AI models directly** — it calls FastAPI webhooks
+- **AI services never query NavNet Registry directly** — they use `registry_client.py` only
 
 ### 5.2 Async-first
 
@@ -544,11 +539,11 @@ Persistence ownership:     PostgreSQL (work orders, audit, health scores)
 
 ### 5.4 Resilience
 
-- `tb_client.py` retries all requests 3 times with exponential backoff (1s, 2s, 4s)
+- `registry_client.py` retries all requests 3 times with exponential backoff (1s, 2s, 4s)
 - LLM calls have a 120-second timeout — fail fast and return a structured error to the widget
 - Kafka consumer catches all processing exceptions per message — failed messages go to `platform2.dlq` dead letter topic, consumer continues
 - If Chroma is unavailable, RAG pipeline returns an empty document list and logs a warning — Chat still works with device context only
-- If ThingsBoard REST API is unavailable, `context_builder.py` returns partial context with `tb_available: false` flag — Chat still proceeds
+- If NavNet Registry is unavailable, `context_builder.py` returns partial context with `tb_available: false` flag — Chat still proceeds
 
 ### 5.5 Observability
 
@@ -575,7 +570,7 @@ The `/health` endpoint returns:
     "redis": "ok|error",
     "chroma": "ok|error",
     "kafka": "ok|error",
-    "thingsboard": "ok|error",
+    "registry": "ok|error",
     "llm": "ok|error"
   },
   "models_loaded": {
@@ -599,8 +594,8 @@ Never use `if ENV == "production"` branching in application code. All environmen
 ### 5.7 Data flow — one direction
 
 ```
-Devices → ThingsBoard → Kafka → FastAPI AI services → ThingsBoard (write-back only)
-                     → Webhook → FastAPI AI services → ThingsBoard (write-back only)
+Devices → NavNet Registry → Kafka → FastAPI AI services → NavNet Registry (write-back only)
+                     → Webhook → FastAPI AI services → NavNet Registry (write-back only)
                                                      → PostgreSQL
 Operator → Widget → FastAPI /chat → LLM → Widget (SSE stream)
                   → FastAPI /workorders → PostgreSQL
@@ -612,12 +607,12 @@ FastAPI never pushes unsolicited data to the widget. Widgets poll or respond to 
 
 ## 6. Widget Design Standards
 
-Both widgets (`vantage_chat.html`, `vantage_workorders.html`) must follow these rules.
+Both widgets (`navnet_chat.html`, `navnet_workorders.html`) must follow these rules.
 
 ### 6.1 Visual standards
 
 ```css
-/* Use ThingsBoard CSS variables — never hardcode colours */
+/* Use NavNet CSS variables — never hardcode colours */
 --tb-primary-color          /* primary brand colour from TB theme */
 --tb-primary-text-color     /* primary text */
 --tb-secondary-text-color   /* secondary/muted text */
@@ -626,19 +621,19 @@ Both widgets (`vantage_chat.html`, `vantage_workorders.html`) must follow these 
 --tb-error-color            /* error states */
 
 /* Typography */
-font-family: Roboto, sans-serif;   /* always — matches ThingsBoard */
+font-family: Roboto, sans-serif;   /* always — matches NavNet */
 font-size: 14px;                    /* base size for widget body */
 
 /* Spacing — use multiples of 8px: 4, 8, 12, 16, 24, 32 */
 /* Border radius: 4px for inputs, 8px for cards */
-/* Elevation (box-shadow): match ThingsBoard Material elevation levels */
+/* Elevation (box-shadow): match NavNet Material elevation levels */
 ```
 
-### 6.2 Vantage Chat widget — UI spec
+### 6.2 NavNet Chat widget — UI spec
 
 ```
 ┌─────────────────────────────────────────────┐
-│ ⬡ Vantage Chat          [device name]  [×] │  ← header bar
+│ ⬡ NavNet Chat          [device name]  [×] │  ← header bar
 ├─────────────────────────────────────────────┤
 │ [Context pills: Power: 4.8kW | Temp: 22°C] │  ← live telemetry strip
 ├─────────────────────────────────────────────┤
@@ -663,11 +658,11 @@ States:
   error      — error message in red, retry button
 ```
 
-### 6.3 Vantage WorkOrders widget — UI spec
+### 6.3 NavNet WorkOrders widget — UI spec
 
 ```
 ┌─────────────────────────────────────────────┐
-│ ⬡ Vantage WorkOrders    [device name]       │
+│ ⬡ NavNet WorkOrders    [device name]       │
 ├─────────────────────────────────────────────┤
 │ ● P1 · AHU-3B bearing wear         OPEN    │  ← priority badge + status
 │   Due: 18 May 2026 · 2hr labour            │
@@ -717,8 +712,8 @@ Overdue work orders: due date text turns red, card gets left border #D32F2F
 ```
 /health                              GET
 /chat                                POST   ← SSE stream
-/webhook/alarm                       POST   ← ThingsBoard rule chain call
-/webhook/cascade                     POST   ← ThingsBoard cascade trigger
+/webhook/alarm                       POST   ← NavNet Registry rule chain call
+/webhook/cascade                     POST   ← NavNet Registry cascade trigger
 /workorders                          GET, POST
 /workorders/{id}                     GET
 /workorders/{id}/status              PATCH
@@ -833,7 +828,7 @@ Constraints:    fk_{table}_{ref}        (fk_work_orders_entity)
 ```bash
 # In .env:
 SECRET_KEY=              # 64-char random hex — generated with: openssl rand -hex 32
-TB_ADMIN_PASSWORD=       # never "admin" or "changeme" in production
+REGISTRY_ADMIN_PASSWORD=       # never "admin" or "changeme" in production
 ANTHROPIC_API_KEY=       # never committed to git
 
 # .gitignore must include:
@@ -849,7 +844,7 @@ knowledge_base/docs/
 # entity_id: UUID format validated — reject anything else
 # question: max 1000 characters, stripped of null bytes
 # file paths: never accepted from API input — internal use only
-# Webhook payloads from ThingsBoard: validate against strict Pydantic schema — reject if invalid
+# Webhook payloads from NavNet Registry: validate against strict Pydantic schema — reject if invalid
 ```
 
 ### 9.3 Rate limiting
@@ -865,7 +860,7 @@ knowledge_base/docs/
 ### 9.4 API keys
 
 ```python
-# All outbound API calls (ThingsBoard, LLM providers):
+# All outbound API calls (NavNet Registry, LLM providers):
 # - Keys loaded from config only
 # - Never logged, even at DEBUG level
 # - Redacted in all error messages and stack traces
@@ -887,12 +882,12 @@ chore/{short-description}        chore/pin-dependencies
 
 Follow Conventional Commits:
 ```
-feat(chat): add work order card rendering to Vantage Chat widget
+feat(chat): add work order card rendering to NavNet Chat widget
 fix(anomaly): prevent duplicate alarm enrichment via Redis dedup
 chore(deps): pin all requirements to exact versions
-docs(internal): add ThingsBoard rule chain export instructions
+docs(internal): add NavNet Registry rule chain export instructions
 test(webhook): add cascade endpoint integration tests
-refactor(tb_client): extract retry logic to shared decorator
+refactor(registry_client): extract retry logic to shared decorator
 ```
 
 ### 10.3 What never goes in git
@@ -962,7 +957,7 @@ pytest-cov==5.0.0
 
 When generating any code, documentation, or configuration for this project:
 
-1. **Check naming** — is anything called "ThingsBoard" in a customer-visible context? Rename to "Vantage NMS" immediately.
+1. **Check naming** — is the underlying registry platform named in a customer-visible context? Rename to "NavNet" immediately.
 
 2. **Check types** — does every function have type hints? Does every Pydantic model have `Field(description=...)`?
 
@@ -987,9 +982,9 @@ When generating any code, documentation, or configuration for this project:
 ## 13. What Claude Must Never Do
 
 - Never suggest React, Vue, Angular, or any JS framework for the widgets
-- Never suggest replacing ThingsBoard CE with a custom-built device management layer
+- Never suggest replacing NavNet Registry with a custom-built device management layer
 - Never suggest SaaS, multi-tenancy, or per-device billing features
-- Never reference "ThingsBoard" in any customer-visible string, comment in widget code, or customer documentation
+- Never reference the underlying registry platform name in any customer-visible string, comment in widget code, or customer documentation
 - Never use `print()` for debugging — always `logger.debug()`
 - Never generate a migration without a corresponding `downgrade()` function
 - Never add a new dependency without adding it to `requirements.txt` with a pinned exact version

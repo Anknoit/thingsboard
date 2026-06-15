@@ -1,5 +1,5 @@
 """
-Vantage NMS — FastAPI AI Services
+NavNet — FastAPI AI Services
 main.py — application entry point with lifespan management.
 """
 
@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI):
     Startup: connect to all downstream services and start background workers.
     Shutdown: gracefully close connections and stop consumers.
     """
-    log.info("startup", service="vantage-nms-fastapi")
+    log.info("startup", service="navnet-fastapi")
 
     # 1. Database
     from db.postgres import engine, Base
@@ -132,8 +132,8 @@ async def lifespan(app: FastAPI):
 
     await app.state.redis.aclose()
 
-    from services.tb_client import get_tb_client
-    await get_tb_client().close()
+    from services.registry_client import get_registry_client
+    await get_registry_client().close()
 
     from db.postgres import engine as db_engine
     await db_engine.dispose()
@@ -144,9 +144,9 @@ async def lifespan(app: FastAPI):
 # ── App ───────────────────────────────────────────────────────────────────────
 
 app = FastAPI(
-    title="Vantage NMS — AI Services",
+    title="NavNet — AI Services",
     version="1.0.0",
-    description="IoT Operations Intelligence Platform — AI backend services.",
+    description="NavNet IoT Operations Intelligence Platform — AI backend services.",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",

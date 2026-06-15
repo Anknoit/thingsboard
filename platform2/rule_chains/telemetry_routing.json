@@ -1,6 +1,6 @@
 {
   "ruleChain": {
-    "name": "Vantage NMS — Telemetry Kafka Routing",
+    "name": "NavNet — Telemetry Kafka Routing",
     "type": "CORE",
     "firstRuleNodeId": null,
     "debugMode": false,

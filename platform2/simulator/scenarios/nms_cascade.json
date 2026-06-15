@@ -93,11 +93,11 @@
   "expected_gnn_root_cause": "SW-CORE-01",
   "demo_script": [
     "1. Inject scenario: POST /inject/nms_cascade",
-    "2. Open Vantage NMS → Network Operations dashboard",
+    "2. Open NavNet → Network Operations dashboard",
     "3. Watch alarms fire on all 4 devices within 2 minutes",
     "4. GNN cascade analysis fires automatically when 3+ alarms hit in 60s",
     "5. Root cause card shows SW-CORE-01 with explanation",
-    "6. Ask Vantage Chat on SW-CORE-01: 'What caused this network cascade?'",
+    "6. Ask NavNet Chat on SW-CORE-01: 'What caused this network cascade?'",
     "7. LLM will describe core switch SFP degradation and blast radius",
     "8. Reset all: POST /reset"
   ]

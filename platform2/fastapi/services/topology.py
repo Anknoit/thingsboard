@@ -1,7 +1,7 @@
 """
 topology.py — Device topology graph service.
 
-Queries ThingsBoard for all devices and their relations, builds a NetworkX
+Queries NavNet Registry for all devices and their relations, builds a NetworkX
 directed graph, and persists it to disk. Used by the GNN service for root
 cause analysis.
 
@@ -15,7 +15,7 @@ Edge types:
 Node attributes (set on each device node):
   device_class   str   — hvac | energy | network | infra | occupancy | elevator | fire
   device_name    str
-  label          str   — device type from ThingsBoard profile
+  label          str   — device type from NavNet Registry profile
   floor          str   — from device attributes (if available)
   zone           str   — from device attributes (if available)
 """
@@ -34,10 +34,10 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
-TOPOLOGY_PATH = os.path.join(os.path.dirname(__file__), "..", "models", "topology.gpickle")
+TOPOLOGY_PATH = "/trained_models/topology.gpickle"
 
-# ThingsBoard relation types we map to edge types
-_TB_REL_MAP: dict[str, str] = {
+# NavNet Registry relation types we map to edge types
+_REL_MAP: dict[str, str] = {
     "Contains":         "contains",
     "Manages":          "handover",
     "PoweredBy":        "power_dependency",
@@ -63,11 +63,11 @@ class TopologyGraph:
 
     # ── Public API ─────────────────────────────────────────────────────────────
 
-    def build_from_tb(self) -> None:
+    def build_from_registry(self) -> None:
         """
         Synchronous wrapper — call from an executor so it does not block the
         event loop:
-            await loop.run_in_executor(None, topology.build_from_tb)
+            await loop.run_in_executor(None, topology.build_from_registry)
         """
         asyncio.run(self._async_build())
 
@@ -132,8 +132,8 @@ class TopologyGraph:
     async def _async_build(self) -> None:
         logger.info("topology: starting graph build")
 
-        from services.tb_client import get_tb_client
-        tb = get_tb_client()
+        from services.registry_client import get_registry_client
+        tb = get_registry_client()
 
         # 1. Fetch all tenant devices (paged)
         devices = await self._fetch_all_devices(tb)
@@ -156,8 +156,8 @@ class TopologyGraph:
                 zone=attrs.get("zone", ""),
             )
 
-        # 3. Fetch explicit TB relations for each device
-        await self._add_tb_relations(tb, devices, g)
+        # 3. Fetch explicit registry relations for each device
+        await self._add_registry_relations(tb, devices, g)
 
         # 4. Infer implicit edges from device_class co-location
         self._add_inferred_edges(devices, g)
@@ -207,14 +207,14 @@ class TopologyGraph:
 
         return devices
 
-    async def _add_tb_relations(
+    async def _add_registry_relations(
         self,
         tb,
         devices: list[dict],
         g: nx.DiGraph,
     ) -> None:
         """
-        For each device, query ThingsBoard /api/relations for both 'from' and
+        For each device, query NavNet Registry /api/relations for both 'from' and
         'to' directions and add typed edges to the graph.
         """
         for device in devices:
@@ -246,7 +246,7 @@ class TopologyGraph:
                         from_id  = rel["from"]["id"]
                         to_id    = rel["to"]["id"]
                         rel_type = rel.get("type", "default")
-                        edge_type = _TB_REL_MAP.get(rel_type, "handover")
+                        edge_type = _REL_MAP.get(rel_type, "handover")
 
                         # Only add if both nodes exist in the graph
                         if from_id in g and to_id in g:

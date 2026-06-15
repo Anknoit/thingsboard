@@ -1,7 +1,7 @@
 """
-tb_client.py — Async ThingsBoard REST API wrapper.
+registry_client.py — Async NavNet Registry API wrapper.
 
-Internal implementation detail. Never reference ThingsBoard in user-facing text.
+Internal implementation detail. Never reference the underlying registry platform in user-facing text.
 """
 
 import asyncio
@@ -19,26 +19,26 @@ _RETRY_ATTEMPTS = 3
 _RETRY_BASE_DELAY = 0.5  # seconds
 
 
-class TBAuthError(Exception):
+class RegistryAuthError(Exception):
     pass
 
 
-class TBClientError(Exception):
+class RegistryClientError(Exception):
     pass
 
 
-class TBClient:
+class RegistryClient:
     """
-    Provider of device data from the underlying IoT platform.
+    Provider of device data from the NavNet device registry.
 
     Handles JWT auth with auto-refresh on 401, exponential-backoff retries,
     and connection pooling via a shared httpx.AsyncClient.
     """
 
     def __init__(self) -> None:
-        self._base_url = settings.tb_url.rstrip("/")
-        self._username = settings.tb_admin_user
-        self._password = settings.tb_admin_password
+        self._base_url = settings.registry_url.rstrip("/")
+        self._username = settings.registry_admin_user
+        self._password = settings.registry_admin_password
         self._token: str | None = None
         self._token_expires_at: float = 0.0
         self._refresh_token: str | None = None
@@ -67,13 +67,13 @@ class TBClient:
             json={"username": self._username, "password": self._password},
         )
         if resp.status_code != 200:
-            raise TBAuthError(f"ThingsBoard login failed: {resp.status_code} {resp.text}")
+            raise RegistryAuthError(f"NavNet Registry login failed: {resp.status_code} {resp.text}")
         data = resp.json()
         self._token = data["token"]
         self._refresh_token = data.get("refreshToken")
-        # TB tokens expire in ~2.5h; refresh 5 min early
+        # Registry tokens expire in ~2.5h; refresh 5 min early
         self._token_expires_at = time.monotonic() + settings.jwt_expiry_seconds - 300
-        logger.debug("ThingsBoard auth token acquired")
+        logger.debug("NavNet Registry auth token acquired")
 
     async def _refresh_auth(self) -> None:
         if not self._refresh_token:
@@ -137,13 +137,13 @@ class TBClient:
             except (httpx.TransportError, httpx.TimeoutException) as exc:
                 last_exc = exc
                 delay = _RETRY_BASE_DELAY * (2 ** attempt)
-                logger.warning("TB request %s %s failed (attempt %d): %s — retrying in %.1fs",
+                logger.warning("Registry request %s %s failed (attempt %d): %s — retrying in %.1fs",
                                method, path, attempt + 1, exc, delay)
                 await asyncio.sleep(delay)
             except httpx.HTTPStatusError as exc:
-                raise TBClientError(f"TB API error {exc.response.status_code}: {exc.response.text}") from exc
+                raise RegistryClientError(f"Registry API error {exc.response.status_code}: {exc.response.text}") from exc
 
-        raise TBClientError(f"TB request failed after {_RETRY_ATTEMPTS} attempts") from last_exc
+        raise RegistryClientError(f"Registry request failed after {_RETRY_ATTEMPTS} attempts") from last_exc
 
     # ── Public API ───────────────────────────────────────────────────────────
 
@@ -245,7 +245,7 @@ class TBClient:
 
     async def update_alarm_attributes(self, alarm_id: str, attributes: dict) -> bool:
         """Write AI-enrichment attributes to a device (server-scope) linked to an alarm."""
-        # TB alarms don't have direct attribute storage; we write to the originator device.
+        # Alarms don't have direct attribute storage; we write to the originator device.
         # The alarm_id is used as an audit reference. Caller should pass the device entity_id
         # as the target — this method signature mirrors the dev plan for convenience.
         # Actual write goes to SERVER_SCOPE attributes of the alarm's originator.
@@ -256,7 +256,7 @@ class TBClient:
                 json={"comment": str(attributes)},
             )
             return True
-        except TBClientError:
+        except RegistryClientError:
             return False
 
     async def set_device_server_attributes(self, entity_id: str, attributes: dict) -> None:
@@ -271,7 +271,7 @@ class TBClient:
         await self._request("POST", f"/api/alarm/{alarm_id}/ack")
 
     async def health_check(self) -> bool:
-        """Returns True if ThingsBoard is reachable and auth works."""
+        """Returns True if NavNet Registry is reachable and auth works."""
         try:
             await self._ensure_token()
             return True
@@ -280,11 +280,11 @@ class TBClient:
 
 
 # Module-level singleton
-_client: TBClient | None = None
+_client: RegistryClient | None = None
 
 
-def get_tb_client() -> TBClient:
+def get_registry_client() -> RegistryClient:
     global _client
     if _client is None:
-        _client = TBClient()
+        _client = RegistryClient()
     return _client

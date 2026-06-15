@@ -1,6 +1,6 @@
 {
   "ruleChain": {
-    "name": "Vantage NMS — Alarm Webhooks",
+    "name": "NavNet — Alarm Webhooks",
     "type": "CORE",
     "firstRuleNodeId": null,
     "debugMode": false,

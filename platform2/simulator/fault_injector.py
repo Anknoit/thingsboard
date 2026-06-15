@@ -1,5 +1,5 @@
 """
-fault_injector.py — Vantage NMS demo fault injection server.
+fault_injector.py — NavNet demo fault injection server.
 
 Runs on port 8001 (separate from the main FastAPI on 8000).
 Used exclusively in demo / development mode (docker compose --profile demo).
@@ -42,7 +42,7 @@ SCENARIOS_DIR  = Path(__file__).parent / "scenarios"
 STATE_FILE     = Path(os.getenv("INJECTOR_STATE_FILE", "/tmp/vantage_injections.json"))
 
 app = FastAPI(
-    title="Vantage NMS — Fault Injector",
+    title="NavNet — Fault Injector",
     version="1.0.0",
     description="Demo fault injection API. For development and demo use only.",
     docs_url="/docs",

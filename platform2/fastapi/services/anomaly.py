@@ -23,7 +23,7 @@ from models.schemas import AnomalyResult
 
 logger = logging.getLogger(__name__)
 
-MODEL_DIR = os.path.join(os.path.dirname(__file__), "..", "models")
+MODEL_DIR = "/trained_models"
 
 # ── Feature definitions per device class ─────────────────────────────────────
 

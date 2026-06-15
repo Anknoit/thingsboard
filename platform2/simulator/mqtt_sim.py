@@ -1,19 +1,19 @@
 """
-mqtt_sim.py — Vantage NMS demo MQTT telemetry simulator.
+mqtt_sim.py — NavNet demo MQTT telemetry simulator.
 
-Publishes realistic telemetry for 16 devices to ThingsBoard via MQTT.
+Publishes realistic telemetry for 16 devices to NavNet Registry via MQTT.
 Each device runs on its own asyncio loop at its natural publish interval.
 The fault_injector can override any device's telemetry via a shared dict.
 
 Usage:
     python mqtt_sim.py
-    python mqtt_sim.py --host tb.example.com --port 1883 --interval 30
+    python mqtt_sim.py --host registry.example.com --port 1883 --interval 30
 
 Environment variables (also accepted):
-    TB_MQTT_HOST    ThingsBoard MQTT broker host (default: localhost)
-    TB_MQTT_PORT    1883 or 8883 for TLS (default: 1883)
-    SIM_INTERVAL    Base publish interval in seconds (default: 30)
-    SIM_DEVICES     Path to devices.json (default: devices.json)
+    REGISTRY_MQTT_HOST    NavNet MQTT broker host (default: localhost)
+    REGISTRY_MQTT_PORT    1883 or 8883 for TLS (default: 1883)
+    SIM_INTERVAL          Base publish interval in seconds (default: 30)
+    SIM_DEVICES           Path to devices.json (default: devices.json)
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
 )
-logger = logging.getLogger("vantage.simulator")
+logger = logging.getLogger("navnet.simulator")
 
 # ── Shared injection state (written by fault_injector, read by generators) ───
 # Dict of device_name → {telemetry_key: override_value, "__until": epoch_float}
@@ -237,7 +237,7 @@ async def run_simulator(host: str, port: int, interval: float, devices_path: Pat
         devices: list[dict] = json.load(f)
 
     logger.info(
-        "Starting Vantage NMS simulator — %d devices, interval=%.0fs, broker=%s:%d",
+        "Starting NavNet simulator — %d devices, interval=%.0fs, broker=%s:%d",
         len(devices), interval, host, port,
     )
 
@@ -275,9 +275,9 @@ async def run_simulator(host: str, port: int, interval: float, devices_path: Pat
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Vantage NMS MQTT simulator")
-    parser.add_argument("--host",     default=os.getenv("TB_MQTT_HOST", "localhost"))
-    parser.add_argument("--port",     type=int, default=int(os.getenv("TB_MQTT_PORT", "1883")))
+    parser = argparse.ArgumentParser(description="NavNet MQTT simulator")
+    parser.add_argument("--host",     default=os.getenv("REGISTRY_MQTT_HOST", "localhost"))
+    parser.add_argument("--port",     type=int, default=int(os.getenv("REGISTRY_MQTT_PORT", "1883")))
     parser.add_argument("--interval", type=float, default=float(os.getenv("SIM_INTERVAL", "30")))
     parser.add_argument(
         "--devices",

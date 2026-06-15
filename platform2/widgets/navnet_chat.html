@@ -1,6 +1,6 @@
 <!--
-  Vantage Chat — ThingsBoard Custom Widget
-  Paste the entire contents of this file into the ThingsBoard widget HTML tab.
+  NavNet Chat — NavNet Widget
+  Paste the entire contents of this file into the NavNet widget editor HTML tab.
 
   Widget settings schema (add in "Settings" tab of widget editor):
     FASTAPI_URL  (string, required)  e.g. http://localhost:8000
@@ -276,9 +276,10 @@
 (function () {
   'use strict';
 
-  // ── ThingsBoard widget lifecycle ──────────────────────────────────────────
+  // ── NavNet widget lifecycle ──────────────────────────────────────────
 
   self.onInit = function () {
+    try {
     const ctx = self.ctx;
 
     // Widget settings
@@ -289,26 +290,35 @@
     // Device info from datasource
     const ds         = ctx.datasources && ctx.datasources[0];
     const entityId   = ds ? (ds.entityId && ds.entityId.id ? ds.entityId.id : ds.entityId) : '';
-    const entityName = ds ? ds.entityName : 'Unknown device';
+    const entityName = ds ? (ds.entityName || ds.name || 'Unknown device') : 'Unknown device';
+
+    // Use widget container scope — more reliable than document.getElementById in NavNet
+    const root = (ctx.$container && ctx.$container[0]) || document;
+    const q    = id => root.querySelector('#' + id);
 
     // UI refs
-    const $deviceName   = document.getElementById('vc-device-name');
-    const $pills        = document.getElementById('vc-pills');
-    const $responseText = document.getElementById('vc-response-text');
-    const $typing       = document.getElementById('vc-typing');
-    const $error        = document.getElementById('vc-error');
-    const $woCard       = document.getElementById('vc-wo-card');
-    const $copyBtn      = document.getElementById('vc-copy-btn');
-    const $question     = document.getElementById('vc-question');
-    const $sendBtn      = document.getElementById('vc-send-btn');
-    const $clearBtn     = document.getElementById('vc-clear-btn');
+    const $deviceName   = q('vc-device-name');
+    const $pills        = q('vc-pills');
+    const $responseText = q('vc-response-text');
+    const $typing       = q('vc-typing');
+    const $error        = q('vc-error');
+    const $woCard       = q('vc-wo-card');
+    const $copyBtn      = q('vc-copy-btn');
+    const $question     = q('vc-question');
+    const $sendBtn      = q('vc-send-btn');
+    const $clearBtn     = q('vc-clear-btn');
 
-    $deviceName.textContent = entityName;
+    if (!$sendBtn || !$question) {
+      console.error('NavNet Chat: widget DOM elements not found');
+      return;
+    }
+
+    if ($deviceName) $deviceName.textContent = entityName;
 
     // ── Telemetry pills ───────────────────────────────────────────────────
     function refreshPills() {
       const data = ctx.data || [];
-      $pills.innerHTML = '';
+      if ($pills) $pills.innerHTML = '';
       let count = 0;
       for (const series of data) {
         if (!series.data || !series.data.length) continue;
@@ -531,12 +541,19 @@
       $question.style.height = 'auto';
       $question.style.height = Math.min($question.scrollHeight, 100) + 'px';
     });
+
+    } catch (err) {
+      console.error('NavNet Chat onInit error:', err);
+      const errEl = document.querySelector('#vc-error') || (self.ctx && self.ctx.$container && self.ctx.$container[0] && self.ctx.$container[0].querySelector('#vc-error'));
+      if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'Widget init error: ' + err.message; }
+    }
   };
 
-  // Called by ThingsBoard when telemetry data updates
+  // Called by NavNet when telemetry data updates
   self.onDataUpdated = function () {
     if (self.ctx && self.ctx.data) {
-      const $pills = document.getElementById('vc-pills');
+      const root = (self.ctx.$container && self.ctx.$container[0]) || document;
+      const $pills = root.querySelector('#vc-pills');
       if (!$pills) return;
       $pills.innerHTML = '';
       let count = 0;

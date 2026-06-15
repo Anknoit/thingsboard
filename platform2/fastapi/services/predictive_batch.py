@@ -5,12 +5,12 @@ Registered in main.py lifespan via APScheduler.
 Also callable on-demand via POST /debug/run-predictive.
 
 Job steps:
-  1. Query ThingsBoard for all BMS devices
+  1. Query NavNet Registry for all BMS devices
   2. For each device: run LSTM scoring
   3. Write health score to equipment_health TimescaleDB hypertable
   4. If failure_probability > threshold:
        a. Redis dedup (48hr window per device)
-       b. Create PREDICTIVE_FAILURE alarm in ThingsBoard
+       b. Create PREDICTIVE_FAILURE alarm in NavNet Registry
        c. Create work order in PostgreSQL
 """
 
@@ -48,10 +48,10 @@ async def run_predictive_batch() -> dict:
         "errors": 0,
     }
 
-    from services.tb_client import get_tb_client
+    from services.registry_client import get_registry_client
     from services.predictive import get_predictive_service
 
-    tb  = get_tb_client()
+    tb  = get_registry_client()
     svc = get_predictive_service()
 
     # 1. Get all BMS devices
@@ -89,9 +89,9 @@ async def _fetch_bms_devices(tb) -> list[dict]:
     Uses TB device listing + attribute check (same approach as train_anomaly.py).
     """
     try:
-        # TB REST: GET /api/tenant/devices  (paged)
+        # Registry REST: GET /api/tenant/devices  (paged)
         import httpx
-        base = settings.tb_url.rstrip("/")
+        base = settings.registry_url.rstrip("/")
         token = tb._token or (await tb._ensure_token())
 
         devices: list[dict] = []
@@ -165,7 +165,7 @@ async def _score_device(device: dict, tb, svc, summary: dict) -> None:
         finally:
             await redis.aclose()
 
-        # 4b. Create PREDICTIVE_FAILURE alarm in ThingsBoard
+        # 4b. Create PREDICTIVE_FAILURE alarm in NavNet Registry
         try:
             alarm_id = await tb.create_alarm(
                 entity_id=entity_id,

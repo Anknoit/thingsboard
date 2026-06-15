@@ -1,8 +1,8 @@
-# Vantage NMS — Operator Onboarding Guide
+# NavNet — Operator Onboarding Guide
 
-**Tasaar Vantage NMS** — *See everything. Fix anything.*
+**Tasaar NavNet** — *See everything. Fix anything.*
 
-This guide walks through installing, configuring, and operating Vantage NMS from first boot to day-2 operations.
+This guide walks through installing, configuring, and operating NavNet from first boot to day-2 operations.
 
 ---
 
@@ -20,16 +20,175 @@ This guide walks through installing, configuring, and operating Vantage NMS from
 
 ---
 
+## Section 0 — Quick Start: Docker Deployment
+
+This section covers the complete deployment sequence from a fresh machine to a running NavNet stack. The entire platform runs inside Docker — no Python, Java, or Node.js installation is required on your host.
+
+### 0.1 Prerequisites check
+
+```bash
+docker --version          # Docker Engine 24+
+docker compose version    # Docker Compose v2 (not the legacy docker-compose v1)
+make --version            # GNU Make
+```
+
+### 0.2 Create your `.env` file
+
+```bash
+cd /opt/navnet
+cp .env.example .env
+nano .env
+```
+
+Set at minimum these four values:
+
+```env
+REGISTRY_ADMIN_PASSWORD=your-secure-password        # min 12 chars
+REGISTRY_DB_PASSWORD=your-db-password
+P2_DB_PASSWORD=your-p2-db-password
+SECRET_KEY=your-64-char-random-string         # generate: openssl rand -hex 32
+```
+
+Set your AI provider key:
+
+```env
+LLM_PROVIDER=claude          # claude | openai | ollama
+ANTHROPIC_API_KEY=sk-ant-...
+# OPENAI_API_KEY=...         # if using openai
+# OLLAMA_BASE_URL=http://ollama:11434   # if self-hosting
+```
+
+### 0.3 Build Docker images
+
+```bash
+make build
+```
+
+Builds the `fastapi` and `simulator` images from their Dockerfiles. Only required on first run or after a code change.
+
+### 0.4 Start the core stack
+
+```bash
+make start
+```
+
+Starts services in dependency order:
+
+```
+Zookeeper → Kafka → PostgreSQL → Redis → ChromaDB → NavNet Registry → FastAPI
+```
+
+NavNet Registry initialises its schema on first boot — allow **2–3 minutes** before all health checks pass. Follow progress with:
+
+```bash
+make logs           # all services
+make logs-fastapi   # AI service only
+```
+
+### 0.5 Verify the stack is healthy
+
+```bash
+make status
+```
+
+All containers should show `Up (healthy)`. The AI service health endpoint should return:
+
+```json
+{
+  "status": "healthy",
+  "services": {
+    "postgres": "ok",
+    "redis": "ok",
+    "chroma": "ok",
+    "kafka": "ok",
+    "registry": "ok",
+    "llm": "ok"
+  },
+  "models_loaded": {
+    "isolation_forest": ["hvac", "energy", "network", "infra"],
+    "lstm": ["hvac"],
+    "gnn": true
+  }
+}
+```
+
+### 0.6 First-time initialisation (run once)
+
+```bash
+# Run database migrations
+make migrate
+
+# Register devices in the registry and generate MQTT credentials
+make onboard
+
+# Generate 30-day synthetic baseline and train anomaly models (~3 min)
+make generate-baseline
+
+# Optional: seed device manuals into the RAG knowledge base
+# (drop PDFs into knowledge_base/docs/ first)
+make seed-knowledge
+```
+
+### 0.7 Access the platform
+
+| Service | URL | Notes |
+|---|---|---|
+| **NavNet UI** | `http://<server>:8080` | Dashboards, devices, alarms |
+| **AI Service API** | `http://<server>:8000/docs` | Swagger UI for all AI endpoints |
+| **AI Health** | `http://<server>:8000/health` | Service and model status |
+| **ChromaDB** | `http://<server>:8002` | Vector store (internal) |
+
+Default login: `tenant@navnet.local` / `<REGISTRY_ADMIN_PASSWORD>`
+
+### 0.8 Docker service map
+
+| Container | Image | Purpose |
+|---|---|---|
+| `thingsboard` | `thingsboard/tb-postgres` | Device registry, MQTT broker, UI |
+| `postgres` | `timescale/timescaledb` | NavNet Registry DB + NavNet AI data |
+| `kafka` | `confluentinc/cp-kafka` | Telemetry message bus |
+| `zookeeper` | `confluentinc/cp-zookeeper` | Kafka coordination |
+| `redis` | `redis:alpine` | Rate limiting and dedup cache |
+| `chroma` | `chromadb/chroma` | RAG vector store |
+| `fastapi` | *(built locally)* | Chat, anomaly, predictive, GNN services |
+| `simulator` | *(built locally)* | MQTT simulator + fault injector (demo only) |
+
+### 0.9 Common day-to-day commands
+
+```bash
+make stop                          # stop all services (data volumes preserved)
+make restart                       # restart all services
+make logs-fastapi                  # tail AI service logs
+make logs-follow SERVICE=kafka     # follow a specific service
+make shell                         # bash shell inside FastAPI container
+make shell-db                      # psql into platform2 database
+make backup                        # backup PostgreSQL + ChromaDB
+make clean-all                     # DESTRUCTIVE: wipe containers and volumes
+```
+
+### 0.10 Production hardening
+
+Apply the production overlay to enable resource limits, restrict ports to localhost, and run 4 Uvicorn workers:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# or via Makefile (set PRODUCTION=true in your CI/CD env)
+```
+
+Production changes: external PostgreSQL/Redis/Kafka ports are removed, NavNet Registry HTTP binds to `127.0.0.1` only (put Nginx or a load balancer in front), FastAPI runs with `--workers 4 --loop uvloop`.
+
+---
+
 ## Section 1 — First-Time Installation
 
 ### 1.1 Clone and configure
 
 ```bash
-# Clone the Vantage NMS package to your server
+# Clone the NavNet package to your server
 cd /opt
-sudo git clone <your-repo-url> vantage-nms
-sudo chown -R $USER:$USER /opt/vantage-nms
-cd /opt/vantage-nms
+sudo git clone <your-repo-url> navnet
+sudo chown -R $USER:$USER /opt/navnet
+cd /opt/navnet
 ```
 
 ### 1.2 Set environment variables
@@ -42,15 +201,15 @@ nano .env
 Fill in every value marked `REQUIRED`:
 
 ```ini
-# Vantage NMS — Environment Configuration
+# NavNet — Environment Configuration
 
 # ── REQUIRED: change all of these before first start ──────────────────────────
 
 # Platform admin credentials
-TB_ADMIN_PASSWORD=<strong-password>        # min 12 chars
+REGISTRY_ADMIN_PASSWORD=<strong-password>        # min 12 chars
 
 # Database passwords
-TB_DB_PASSWORD=<strong-password>
+REGISTRY_DB_PASSWORD=<strong-password>
 P2_DB_PASSWORD=<strong-password>
 
 # Application secret (generate with: openssl rand -hex 32)
@@ -69,7 +228,7 @@ ANTHROPIC_API_KEY=<your-anthropic-key>     # required if LLM_PROVIDER=claude
 make start
 ```
 
-This starts: Vantage NMS core, AI services, message bus, time-series database, cache, and vector store.
+This starts: NavNet core, AI services, message bus, time-series database, cache, and vector store.
 
 Verify all services are healthy:
 
@@ -141,7 +300,7 @@ Keys must match the feature set for the device class:
 
 ### 3.1 Import rule chains
 
-Log into the Vantage NMS portal at `http://<server>:8080`.
+Log into the NavNet portal at `http://<server>:8080`.
 
 Navigate to **Rule Chains** and import both files from `rule_chains/`:
 
@@ -154,8 +313,8 @@ Set `alarm_webhook.json` as the **root rule chain**.
 
 Follow the instructions in `widgets/WIDGET_REGISTRATION.md` to register:
 
-- **Vantage Chat** (`widgets/vantage_chat.html`) — conversational AI for any device
-- **Vantage WorkOrders** (`widgets/vantage_workorders.html`) — predictive maintenance queue
+- **NavNet Chat** (`widgets/navnet_chat.html`) — conversational AI for any device
+- **NavNet WorkOrders** (`widgets/navnet_workorders.html`) — predictive maintenance queue
 
 In each widget's settings, set:
 
@@ -251,7 +410,7 @@ curl http://localhost:8000/health
     "redis": "ok",
     "chroma": "ok",
     "kafka": "ok",
-    "thingsboard": "ok",
+    "registry": "ok",
     "llm": "ok"
   },
   "models_loaded": {
@@ -281,7 +440,7 @@ make backup-chroma      # vector store only
 Backups are saved to `backups/<timestamp>/`. Schedule this daily via cron:
 
 ```cron
-0 2 * * * cd /opt/vantage-nms && make backup-pg >> /var/log/vantage-backup.log 2>&1
+0 2 * * * cd /opt/navnet && make backup-pg >> /var/log/vantage-backup.log 2>&1
 ```
 
 ### Rebuilding the topology graph
@@ -302,27 +461,27 @@ make train-all
 
 ---
 
-## Section 7 — Vantage Chat — Operator Guide
+## Section 7 — NavNet Chat — Operator Guide
 
-**Vantage Chat** is available on every device panel. Ask questions in natural language:
+**NavNet Chat** is available on every device panel. Ask questions in natural language:
 
-| Question | What Vantage Intelligence does |
+| Question | What NavNet Intelligence does |
 |---|---|
 | *"Why is this device showing high temperature?"* | Correlates telemetry trend with alarm history, retrieves relevant maintenance docs, suggests root cause |
 | *"What maintenance is due?"* | Checks LSTM predictive scores, reviews open work orders, summarises upcoming tasks |
 | *"Is this a cascade or isolated fault?"* | Queries GNN root cause result, explains blast radius |
-| *"Create a work order for bearing replacement"* | Extracts structured work order and saves to Vantage WorkOrders queue |
+| *"Create a work order for bearing replacement"* | Extracts structured work order and saves to NavNet WorkOrders queue |
 
 **Tips:**
 - The more specific the question, the more actionable the answer
 - Ask follow-up questions — context is maintained within the conversation
-- Work orders are created automatically when the AI recommends an action; confirm or dismiss in Vantage WorkOrders
+- Work orders are created automatically when the AI recommends an action; confirm or dismiss in NavNet WorkOrders
 
 ---
 
-## Section 8 — Vantage WorkOrders — Operator Guide
+## Section 8 — NavNet WorkOrders — Operator Guide
 
-**Vantage WorkOrders** shows all open maintenance tasks for the selected device.
+**NavNet WorkOrders** shows all open maintenance tasks for the selected device.
 
 ### Work order lifecycle
 

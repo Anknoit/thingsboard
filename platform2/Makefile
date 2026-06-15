@@ -1,4 +1,4 @@
-# Vantage NMS — Operational Makefile
+# NavNet — Operational Makefile
 # Usage: make <target>
 # Run `make help` to list all available targets.
 
@@ -46,26 +46,26 @@ CYAN   := \033[36m
 
 help: ## Show this help message
 	@echo ""
-	@echo "  $(BOLD)Vantage NMS — Operational Commands$(RESET)"
+	@echo "  $(BOLD)NavNet — Operational Commands$(RESET)"
 	@echo ""
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*##/ { \
 		printf "  $(CYAN)%-22s$(RESET) %s\n", $$1, $$2 \
 	}' $(MAKEFILE_LIST) | sort
 	@echo ""
 	@echo "  $(YELLOW)Demo workflow:$(RESET)"
-	@echo "    make demo  →  inject a fault  →  open Vantage NMS  →  make demo-stop"
+	@echo "    make demo  →  inject a fault  →  open NavNet  →  make demo-stop"
 	@echo ""
 
 
 # ── Stack lifecycle ───────────────────────────────────────────────────────────
 
 start: check-env ## Start all core services (production mode)
-	@echo "$(GREEN)Starting Vantage NMS...$(RESET)"
+	@echo "$(GREEN)Starting NavNet...$(RESET)"
 	$(COMPOSE) up -d
 	@echo "$(GREEN)Stack is up. Run 'make status' to verify.$(RESET)"
 
 stop: ## Stop all services (data volumes preserved)
-	@echo "$(YELLOW)Stopping Vantage NMS...$(RESET)"
+	@echo "$(YELLOW)Stopping NavNet...$(RESET)"
 	$(COMPOSE) down
 	@echo "$(YELLOW)Stack stopped. Data volumes intact.$(RESET)"
 
@@ -99,11 +99,11 @@ build-no-cache: ## Force rebuild all images without cache
 # ── Demo mode ─────────────────────────────────────────────────────────────────
 
 demo: check-env ## Start full stack including MQTT simulator and fault injector
-	@echo "$(GREEN)Starting Vantage NMS in demo mode...$(RESET)"
+	@echo "$(GREEN)Starting NavNet in demo mode...$(RESET)"
 	$(COMPOSE_DEMO) up -d
 	@echo ""
 	@echo "  $(BOLD)Fault injector:$(RESET)  http://localhost:8001/docs"
-	@echo "  $(BOLD)Vantage NMS UI:$(RESET)  http://localhost:8080"
+	@echo "  $(BOLD)NavNet UI:$(RESET)  http://localhost:8080"
 	@echo "  $(BOLD)AI services:$(RESET)     http://localhost:8000/docs"
 	@echo ""
 	@echo "  Available scenarios:"
@@ -137,11 +137,11 @@ reset-injections: ## Clear all active fault injections
 
 # ── Device onboarding ─────────────────────────────────────────────────────────
 
-onboard: ## Onboard all devices from scripts/devices_sample.csv into Vantage NMS
+onboard: ## Onboard all devices from scripts/devices_sample.csv into NavNet
 	@echo "$(GREEN)Onboarding devices...$(RESET)"
-	$(COMPOSE) exec $(FASTAPI_SVC) python /app/../scripts/onboard_devices.py \
-		--csv /app/../scripts/devices_sample.csv \
-		--output /app/../simulator/credentials.csv
+	$(COMPOSE) exec -e PYTHONPATH=/app $(FASTAPI_SVC) python /scripts/onboard_devices.py \
+		--csv /scripts/devices_sample.csv \
+		--output /simulator/credentials.csv
 	@echo "$(GREEN)Devices onboarded. Credentials saved to simulator/credentials.csv$(RESET)"
 
 
@@ -178,12 +178,12 @@ seed-faults: ## Seed fault history from knowledge_base/fault_history_sample.csv
 
 train-anomaly: ## Train Isolation Forest anomaly models (all device classes)
 	@echo "$(GREEN)Training anomaly detection models...$(RESET)"
-	$(COMPOSE) exec $(FASTAPI_SVC) python /app/../scripts/train_anomaly.py
+	$(COMPOSE) exec -e PYTHONPATH=/app $(FASTAPI_SVC) python /scripts/train_anomaly.py
 	@echo "$(GREEN)Anomaly models trained and saved.$(RESET)"
 
 train-lstm: ## Train LSTM predictive maintenance models (all device classes)
 	@echo "$(GREEN)Training LSTM predictive models...$(RESET)"
-	$(COMPOSE) exec $(FASTAPI_SVC) python /app/../scripts/train_lstm.py
+	$(COMPOSE) exec -e PYTHONPATH=/app $(FASTAPI_SVC) python /scripts/train_lstm.py
 	@echo "$(GREEN)LSTM models trained and saved.$(RESET)"
 
 build-topology: ## Build device topology graph from live device relations
@@ -205,7 +205,7 @@ train-all: ## Run full training pipeline (anomaly → LSTM → topology → GNN)
 
 generate-baseline: ## Generate synthetic 30-day baseline and train anomaly models
 	@echo "$(GREEN)Generating synthetic baseline data...$(RESET)"
-	$(COMPOSE) exec $(FASTAPI_SVC) python /app/../scripts/generate_synthetic_baseline.py
+	$(COMPOSE) exec -e PYTHONPATH=/app $(FASTAPI_SVC) python /scripts/generate_synthetic_baseline.py
 	@echo "$(GREEN)Synthetic baseline generated and models trained.$(RESET)"
 
 
@@ -303,7 +303,7 @@ check-env: ## Verify required environment variables are set
 		echo ""; \
 	fi
 	@missing=""; \
-	for var in TB_ADMIN_PASSWORD TB_DB_PASSWORD P2_DB_PASSWORD SECRET_KEY; do \
+	for var in REGISTRY_ADMIN_PASSWORD REGISTRY_DB_PASSWORD P2_DB_PASSWORD SECRET_KEY; do \
 		if ! grep -q "^$$var=" .env 2>/dev/null && [ -z "$${!var}" ]; then \
 			missing="$$missing $$var"; \
 		fi; \

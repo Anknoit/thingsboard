@@ -1,5 +1,5 @@
 """
-onboard_devices.py — Bulk device registration for Vantage NMS.
+onboard_devices.py — Bulk device registration for NavNet.
 
 Usage:
     python onboard_devices.py --csv devices.csv
@@ -30,9 +30,9 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-TB_URL = os.getenv("TB_URL", "http://localhost:8080")
-TB_ADMIN_USER = os.getenv("TB_ADMIN_USER", "tenant@thingsboard.org")
-TB_ADMIN_PASSWORD = os.getenv("TB_ADMIN_PASSWORD", "changeme")
+REGISTRY_URL = os.getenv("REGISTRY_URL", "http://localhost:8080")
+REGISTRY_ADMIN_USER = os.getenv("REGISTRY_ADMIN_USER", "admin@navnet.local")
+REGISTRY_ADMIN_PASSWORD = os.getenv("REGISTRY_ADMIN_PASSWORD", "changeme")
 
 # Asset hierarchy to create
 ASSET_GROUPS = [
@@ -59,7 +59,7 @@ ASSET_GROUP_TO_DEVICE_CLASS = {
 }
 
 
-class TBOnboardClient:
+class RegistryOnboardClient:
     def __init__(self, base_url: str, username: str, password: str):
         self.base_url = base_url.rstrip("/")
         self.username = username
@@ -85,7 +85,12 @@ class TBOnboardClient:
     def _post(self, path: str, json: dict) -> dict:
         resp = self.client.post(f"{self.base_url}{path}", json=json)
         resp.raise_for_status()
-        return resp.json()
+        if not resp.content or resp.status_code == 204:
+            return {}
+        try:
+            return resp.json()
+        except Exception:
+            return {}
 
     def _delete(self, path: str) -> None:
         resp = self.client.delete(f"{self.base_url}{path}")
@@ -155,7 +160,7 @@ class TBOnboardClient:
         )
 
 
-def build_asset_tree(client: TBOnboardClient) -> dict[str, str]:
+def build_asset_tree(client: RegistryOnboardClient) -> dict[str, str]:
     """Create the full asset hierarchy; return {name: asset_id}."""
     print("\n[assets] Building asset hierarchy...")
     asset_ids: dict[str, str] = {}
@@ -186,7 +191,7 @@ def build_asset_tree(client: TBOnboardClient) -> dict[str, str]:
     return asset_ids
 
 
-def onboard_devices(csv_path: str, asset_ids: dict[str, str], client: TBOnboardClient) -> list[dict]:
+def onboard_devices(csv_path: str, asset_ids: dict[str, str], client: RegistryOnboardClient) -> list[dict]:
     print(f"\n[devices] Reading {csv_path}...")
     results: list[dict] = []
 
@@ -238,7 +243,7 @@ def onboard_devices(csv_path: str, asset_ids: dict[str, str], client: TBOnboardC
         except httpx.HTTPStatusError as e:
             print(f"FAILED: {e.response.status_code} {e.response.text}")
 
-        # Throttle to avoid overwhelming ThingsBoard
+        # Throttle to avoid overwhelming NavNet Registry
         if i % 10 == 0:
             time.sleep(0.5)
 
@@ -254,7 +259,7 @@ def write_credentials(results: list[dict], output_path: str) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Bulk device registration for Vantage NMS")
+    parser = argparse.ArgumentParser(description="Bulk device registration for NavNet")
     parser.add_argument("--csv", required=True, help="Path to devices CSV file")
     parser.add_argument("--output", default="credentials.csv", help="Output credentials file (default: credentials.csv)")
     args = parser.parse_args()
@@ -263,7 +268,7 @@ def main() -> None:
         print(f"ERROR: CSV file not found: {args.csv}")
         sys.exit(1)
 
-    client = TBOnboardClient(TB_URL, TB_ADMIN_USER, TB_ADMIN_PASSWORD)
+    client = RegistryOnboardClient(REGISTRY_URL, REGISTRY_ADMIN_USER, REGISTRY_ADMIN_PASSWORD)
     client.login()
 
     asset_ids = build_asset_tree(client)

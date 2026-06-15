@@ -29,7 +29,7 @@ from models.schemas import PredictiveResult
 
 logger = logging.getLogger(__name__)
 
-MODEL_DIR = os.path.join(os.path.dirname(__file__), "..", "models")
+MODEL_DIR = "/trained_models"
 SEQ_LEN = 24        # 24 hourly readings = 24-hour look-back window
 N_FEATURES = 4      # fixed across all device classes
 
@@ -239,7 +239,7 @@ class LSTMPredictiveService:
         device_class: str,
     ) -> PredictiveResult | None:
         """
-        Fetch last 24 hours of hourly telemetry from ThingsBoard and score
+        Fetch last 24 hours of hourly telemetry from NavNet Registry and score
         with the LSTM. Returns None if data or model is unavailable.
         """
         bundle = self._load(device_class)
@@ -247,11 +247,11 @@ class LSTMPredictiveService:
             logger.debug("No LSTM model for device_class=%s", device_class)
             return None
 
-        # Fetch 24hr telemetry from ThingsBoard
-        from services.tb_client import get_tb_client
+        # Fetch 24hr telemetry from NavNet Registry
+        from services.registry_client import get_registry_client
         import time as _time
 
-        tb = get_tb_client()
+        tb = get_registry_client()
         now_ms   = int(_time.time() * 1000)
         start_ms = now_ms - 26 * 3600 * 1000  # 26hr buffer
 

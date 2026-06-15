@@ -3,7 +3,7 @@ context_builder.py — Assembles full device context for LLM prompt injection.
 
 Fetches: device metadata, latest telemetry, 48hr trend summary,
          recent alarms, shared attributes.
-Results are cached in Redis for 30 seconds to avoid hammering ThingsBoard
+Results are cached in Redis for 30 seconds to avoid hammering the device registry
 when multiple chat turns happen in quick succession.
 """
 
@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 import redis.asyncio as aioredis
 
 from config import settings
-from services.tb_client import TBClient, TBClientError, get_tb_client
+from services.registry_client import RegistryClient, RegistryClientError, get_registry_client
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +98,7 @@ async def build_device_context(
 ) -> dict:
     """
     Assemble full device context. Merges widget_context on top (more recent).
-    Returns partial context with error flags on ThingsBoard failures.
+    Returns partial context with error flags on NavNet Registry failures.
     """
     redis = await _get_redis()
     cache_key = f"ctx:{entity_id}"
@@ -118,7 +118,7 @@ async def build_device_context(
     finally:
         await redis.aclose()
 
-    tb: TBClient = get_tb_client()
+    registry: RegistryClient = get_registry_client()
     ctx: dict = {
         "entity_id": entity_id,
         "device_name": "unknown",
@@ -134,41 +134,41 @@ async def build_device_context(
 
     # 1. Device metadata
     try:
-        device = await tb.get_device(entity_id)
+        device = await registry.get_device(entity_id)
         ctx["device_name"] = device.get("name", entity_id)
         ctx["device_type"] = device.get("type", "unknown")
-    except TBClientError as exc:
+    except RegistryClientError as exc:
         ctx["errors"].append(f"device_metadata: {exc}")
 
     # 2. Shared attributes (device_class, location, protocol, baseline_days)
     try:
-        attrs = await tb.get_device_attributes(entity_id)
+        attrs = await registry.get_device_attributes(entity_id)
         ctx["attributes"] = attrs
         ctx["device_class"] = attrs.get("device_class", "unknown")
         ctx["location"] = attrs.get("location", "unknown")
         ctx["protocol"] = attrs.get("protocol", "unknown")
-    except TBClientError as exc:
+    except RegistryClientError as exc:
         ctx["errors"].append(f"attributes: {exc}")
 
     # 3. Latest telemetry
     try:
-        latest = await tb.get_latest_telemetry(entity_id)
+        latest = await registry.get_latest_telemetry(entity_id)
         ctx["latest_telemetry"] = latest
-    except TBClientError as exc:
+    except RegistryClientError as exc:
         ctx["errors"].append(f"latest_telemetry: {exc}")
 
     # 4. 48-hour time series summary
     try:
-        readings = await tb.get_telemetry(entity_id, limit=500)
+        readings = await registry.get_telemetry(entity_id, limit=500)
         ctx["telemetry_48hr_summary"] = _summarise_timeseries(readings)
-    except TBClientError as exc:
+    except RegistryClientError as exc:
         ctx["errors"].append(f"telemetry_history: {exc}")
 
     # 5. Recent alarms
     try:
-        alarms = await tb.get_alarms(entity_id, limit=5)
+        alarms = await registry.get_alarms(entity_id, limit=5)
         ctx["recent_alarms"] = _format_alarms(alarms)
-    except TBClientError as exc:
+    except RegistryClientError as exc:
         ctx["errors"].append(f"alarms: {exc}")
 
     # Merge widget context (fresher data wins)

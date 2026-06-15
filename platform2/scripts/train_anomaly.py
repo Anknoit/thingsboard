@@ -1,5 +1,5 @@
 """
-train_anomaly.py — Train Isolation Forest models on historical ThingsBoard data.
+train_anomaly.py — Train Isolation Forest models on historical NavNet Registry data.
 
 Usage:
     python train_anomaly.py --device-class hvac --days 30
@@ -24,7 +24,7 @@ DEVICE_CLASSES = ["hvac", "energy", "network", "infra"]
 
 
 def fetch_devices_by_class(tb, device_class: str) -> list[dict]:
-    """Return all ThingsBoard devices matching device_class shared attribute."""
+    """Return all NavNet Registry devices matching device_class shared attribute."""
     import httpx
 
     # TB doesn't filter by attribute in /api/tenant/devices directly.
@@ -150,7 +150,7 @@ def train_class(device_class: str, days: int) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Train Isolation Forest anomaly models from ThingsBoard telemetry"
+        description="Train Isolation Forest anomaly models from NavNet Registry telemetry"
     )
     parser.add_argument(
         "--device-class",

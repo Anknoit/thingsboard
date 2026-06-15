@@ -20,7 +20,7 @@ version: "3.9"
 
 services:
 
-  thingsboard:
+  navnet-registry:
     ports:
       - "127.0.0.1:8080:9090"   # expose only to localhost — put Nginx in front
       - "0.0.0.0:1883:1883"     # MQTT must be publicly reachable for devices

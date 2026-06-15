@@ -5,9 +5,9 @@ networks:
     driver: bridge
 
 volumes:
-  tb-data:
+  registry-data:
     labels: { backup: "true" }
-  tb-logs:
+  registry-logs:
   pg-data:
     labels: { backup: "true" }
   kafka-data:
@@ -19,36 +19,30 @@ volumes:
 
 services:
 
-  # ── ThingsBoard CE ─────────────────────────────────────────────────────────
-  thingsboard:
+  # ── NavNet Registry (device management platform — internal only) ──────────
+  # Uses its own bundled PostgreSQL (in registry-data volume) — not the
+  # external TimescaleDB container. External postgres is NavNet-only.
+  navnet-registry:
     image: thingsboard/tb-postgres:latest
     restart: unless-stopped
     networks: [platform2-net]
     ports:
-      - "8080:9090"   # HTTP UI + REST API
-      - "1883:1883"   # MQTT
-      - "5683:5683/udp"  # CoAP
+      - "1883:1883"       # MQTT (direct — nginx cannot proxy TCP)
+      - "5683:5683/udp"   # CoAP (direct — nginx cannot proxy UDP)
     environment:
       TB_QUEUE_TYPE: kafka
-      TB_KAFKA_SERVERS: kafka:9092
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/thingsboard
-      SPRING_DATASOURCE_USERNAME: tb
-      SPRING_DATASOURCE_PASSWORD: ${TB_DB_PASSWORD:-changeme}
+      TB_KAFKA_SERVERS: kafka:29092
       # JWT
       JWT_TOKEN_EXPIRATION_TIME: 9000
       JWT_REFRESH_TOKEN_EXPIRATION_TIME: 604800
-      # Demo admin credentials (change on first run)
-      # Initial tenant set via UI after first boot
     volumes:
-      - tb-data:/data
-      - tb-logs:/var/log/thingsboard
+      - registry-data:/data
+      - registry-logs:/var/log/thingsboard
     depends_on:
-      postgres:
-        condition: service_healthy
       kafka:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9090/api/noauth/activate"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/login"]
       interval: 30s
       timeout: 10s
       retries: 10
@@ -62,14 +56,16 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+      KAFKA_OPTS: "-Dzookeeper.4lw.commands.whitelist=ruok,srvr,stat,mntr"
     volumes:
       - zookeeper-data:/var/lib/zookeeper/data
       - zookeeper-logs:/var/lib/zookeeper/log
     healthcheck:
-      test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181 | grep imok"]
+      test: ["CMD", "bash", "-c", "echo srvr | nc -w 2 localhost 2181 | grep -q Mode"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
   # ── Apache Kafka ───────────────────────────────────────────────────────────
   kafka:
@@ -110,13 +106,14 @@ services:
       - "5432:5432"
     environment:
       POSTGRES_USER: tb
-      POSTGRES_PASSWORD: ${TB_DB_PASSWORD:-changeme}
-      POSTGRES_MULTIPLE_DATABASES: thingsboard,platform2
+      POSTGRES_PASSWORD: ${REGISTRY_DB_PASSWORD:-changeme}
+      POSTGRES_MULTIPLE_DATABASES: platform2
+      P2_DB_PASSWORD: ${P2_DB_PASSWORD:-changeme}
     volumes:
       - pg-data:/var/lib/postgresql/data
       - ./scripts/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tb -d thingsboard"]
+      test: ["CMD-SHELL", "pg_isready -U tb -d platform2"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -139,7 +136,7 @@ services:
 
   # ── ChromaDB ───────────────────────────────────────────────────────────────
   chroma:
-    image: chromadb/chroma:latest
+    image: chromadb/chroma:0.5.20
     restart: unless-stopped
     networks: [platform2-net]
     ports:
@@ -148,14 +145,11 @@ services:
       CHROMA_SERVER_HOST: 0.0.0.0
       CHROMA_SERVER_HTTP_PORT: 8000
       IS_PERSISTENT: "TRUE"
-      PERSIST_DIRECTORY: /chroma/data
+      PERSIST_DIRECTORY: /data
     volumes:
-      - chroma-data:/chroma/data
+      - chroma-data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      disable: true
 
   # ── FastAPI AI Services ────────────────────────────────────────────────────
   fastapi:
@@ -168,7 +162,7 @@ services:
       - "8000:8000"
     env_file: .env
     environment:
-      TB_URL: http://thingsboard:9090
+      REGISTRY_URL: http://navnet-registry:9090
       POSTGRES_URL: postgresql+asyncpg://p2:${P2_DB_PASSWORD:-changeme}@postgres:5432/platform2
       REDIS_URL: redis://redis:6379
       KAFKA_BOOTSTRAP: kafka:29092
@@ -176,15 +170,17 @@ services:
       CHROMA_PORT: 8000
     volumes:
       - ./fastapi:/app
-      - ./models:/app/models
+      - ./models:/trained_models
       - ./knowledge_base:/app/knowledge_base
+      - ./scripts:/scripts
+      - ./simulator:/simulator
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
       chroma:
-        condition: service_healthy
+        condition: service_started
       kafka:
         condition: service_healthy
     healthcheck:
@@ -193,6 +189,25 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  # ── NavNet UI Proxy (brand substitution layer) ────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    networks: [platform2-net]
+    ports:
+      - "8080:80"   # All browser traffic enters here; "NavNet" replaces "ThingsBoard"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/assets:/etc/nginx/assets:ro
+    depends_on:
+      - navnet-registry
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 130s
 
   # ── Simulator (demo only — disable in production) ─────────────────────────
   simulator:
@@ -205,17 +220,17 @@ services:
       - "8001:8001"
     profiles: [demo]
     environment:
-      TB_URL: http://thingsboard:9090
-      TB_MQTT_HOST: thingsboard
-      TB_MQTT_PORT: "1883"
+      REGISTRY_URL: http://navnet-registry:9090
+      REGISTRY_MQTT_HOST: navnet-registry
+      REGISTRY_MQTT_PORT: "1883"
       SIM_INTERVAL: "30"
       SIM_DEVICES: /app/devices.json
       FASTAPI_URL: http://fastapi:8000
       CREDENTIALS_CSV: /app/credentials.csv
-      INJECTOR_STATE_FILE: /tmp/vantage_injections.json
+      INJECTOR_STATE_FILE: /tmp/navnet_injections.json
       INJECTOR_PORT: "8001"
     volumes:
       - ./simulator:/app
     depends_on:
-      thingsboard:
+      navnet-registry:
         condition: service_healthy

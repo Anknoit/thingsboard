@@ -1,6 +1,6 @@
 """
 generate_synthetic_baseline.py — Generate 30 days of synthetic telemetry,
-train Isolation Forest models, and optionally publish to ThingsBoard via MQTT.
+train Isolation Forest models, and optionally publish to NavNet Registry via MQTT.
 
 Useful before real device data is available (e.g. at first deployment).
 
@@ -8,7 +8,7 @@ Usage:
     # Generate data and train models only
     python generate_synthetic_baseline.py
 
-    # Also publish to ThingsBoard so dashboards show history
+    # Also publish to NavNet Registry so dashboards show history
     python generate_synthetic_baseline.py --publish --credentials credentials.csv
 """
 
@@ -176,13 +176,13 @@ def generate_dataset(device_class: str, days: int) -> list[dict]:
 
 # ── MQTT publisher (optional) ─────────────────────────────────────────────────
 
-def publish_to_thingsboard(
+def publish_to_registry(
     device_class: str,
     samples: list[dict],
     credentials: dict[str, str],
 ) -> None:
     """
-    Replay historical samples to ThingsBoard via HTTP REST
+    Replay historical samples to NavNet Registry via HTTP REST
     (MQTT doesn't support historic timestamps; use REST telemetry ingestion).
     """
     import httpx
@@ -201,7 +201,7 @@ def publish_to_thingsboard(
     device_name, token = devices[0]
     print(f"  Publishing {len(samples)} samples to {device_name} ...")
 
-    # ThingsBoard REST telemetry ingestion with explicit timestamps
+    # NavNet Registry REST telemetry ingestion with explicit timestamps
     with httpx.Client(timeout=10) as client:
         # Batch into chunks of 100
         chunk_size = 100
@@ -236,7 +236,7 @@ def main() -> None:
     parser.add_argument(
         "--publish",
         action="store_true",
-        help="Publish generated telemetry to ThingsBoard via REST",
+        help="Publish generated telemetry to NavNet Registry via REST",
     )
     parser.add_argument(
         "--credentials",
@@ -290,7 +290,7 @@ def main() -> None:
         print(f"  Normal validation:  score={result_normal.score:.1f} sigma={result_normal.sigma:.2f} → {flag_n}")
 
         if args.publish:
-            publish_to_thingsboard(device_class, samples, credentials)
+            publish_to_registry(device_class, samples, credentials)
 
         print()
 

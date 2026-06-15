@@ -1,5 +1,5 @@
 """
-prompt_builder.py — Constructs the system prompt for Vantage Chat.
+prompt_builder.py — Constructs the system prompt for NavNet Chat.
 
 Injects device context and retrieved knowledge base documents.
 The LLM is instructed to respond as an expert field engineer with a

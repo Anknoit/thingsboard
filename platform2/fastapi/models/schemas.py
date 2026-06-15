@@ -88,7 +88,7 @@ class CascadeAlarmEntry(BaseModel):
 
 class CascadeWebhookPayload(BaseModel):
     """
-    Sent by ThingsBoard when 3+ alarms fire within the cascade window.
+    Sent by NavNet Registry when 3+ alarms fire within the cascade window.
     FastAPI also accumulates these from individual /webhook/alarm calls.
     """
     alarm_id: str

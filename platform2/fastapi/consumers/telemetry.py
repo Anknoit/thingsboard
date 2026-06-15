@@ -1,13 +1,13 @@
 """
 telemetry.py — Kafka consumer that scores every incoming telemetry message
-for anomalies and writes results to TimescaleDB + ThingsBoard.
+for anomalies and writes results to TimescaleDB + NavNet Registry.
 
 Topics consumed (all device classes):
-  tb.telemetry.bms.hvac
-  tb.telemetry.bms.energy
-  tb.telemetry.bms.other
-  tb.telemetry.nms.network
-  tb.telemetry.nms.infra
+  navnet.telemetry.bms.hvac
+  navnet.telemetry.bms.energy
+  navnet.telemetry.bms.other
+  navnet.telemetry.nms.network
+  navnet.telemetry.nms.infra
 
 Consumer group: platform2-anomaly
 Dead-letter queue: platform2.dlq  (malformed / unprocessable messages)
@@ -157,8 +157,8 @@ class TelemetryConsumer:
         device_name: str,
         result,
     ) -> None:
-        from services.tb_client import get_tb_client
-        tb = get_tb_client()
+        from services.registry_client import get_registry_client
+        tb = get_registry_client()
 
         enrichment = {
             "ai_anomaly_score": result.score,
